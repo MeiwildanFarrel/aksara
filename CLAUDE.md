@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-NEXUS is a web-based AI Learning Copilot for Indonesian higher education, built for the TechSprint Innovation Cup 2026. It combines RAG-grounded tutoring, gamified skill trees, and an instructor cognitive dashboard.
+AKSARA is a web-based AI Learning Copilot for Indonesian higher education, built for the TechSprint Innovation Cup 2026. It combines RAG-grounded tutoring, gamified skill trees, and an instructor cognitive dashboard.
 
 **Deadline**: MVP demo by 17 Mei 2026. Final presentation 30 Mei 2026.
 

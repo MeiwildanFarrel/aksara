@@ -1,0 +1,44 @@
+# run-test-auth.ps1
+# Script ini langsung embed cookie — tidak perlu argument
+
+$BASE = "http://localhost:3000"
+
+# ─── PASTE COOKIE DI SINI ───────────────────────────────────────────────────
+# Dari DevTools → Application → Cookies, ambil SEMUA cookie yang dimulai sb-
+# Format: "nama=nilai; nama2=nilai2"
+$COOKIE = "sb-mryrutvzuvizlepvembt-auth-token.0=base64-eyJhY2Nlc3NfdG9rZW4iOiJleUpoYkdjaU9pSkZVekkxTmlJc0ltdHBaQ0k2SW1VeFpHSmpPREJsTFdSbE1tRXROREV6T0MxaFl6QTJMVFEyWW1Oak9XSmtOekJrWXlJc0luUjVjQ0k2SWtwWFZDSjkuZXlKcGMzTWlPaUpvZEhSd2N6b3ZMMjF5ZVhKMWRIWjZkWFpwZW14bGNIWmxiV0owTG5OMWNHRmlZWE5sTG1OdkwyRjFkR2d2ZGpFaUxDSnpkV0lpT2lJMk9EQmtaakl6WkMwd05EYzVMVFEzTW1NdE9EVTBaaTFoT0RSa1pqWTFPREV5WlRnaUxDSmhkV1FpT2lKaGRYUm9aVzUwYVdOaGRHVmtJaXdpWlhod0lqb3hOemMzT0RBNU9ERXpMQ0pwWVhRaU9qRTNOemM0TURZeU1UTXNJbVZ0WVdsc0lqb2liV1ZtZW1GeVlYTm9RR2R0WVdsc0xtTnZiU0lzSW5Cb2IyNWxJam9pSWl3aVlYQndYMjFsZEdGa1lYUmhJanA3SW5CeWIzWnBaR1Z5SWpvaVoyOXZaMnhsSWl3aWNISnZkbWxrWlhKeklqcGJJbWR2YjJkc1pTSmRmU3dpZFhObGNsOXRaWFJoWkdGMFlTSTZleUpoZG1GMFlYSmZkWEpzSWpvaWFIUjBjSE02THk5c2FETXVaMjl2WjJ4bGRYTmxjbU52Ym5SbGJuUXVZMjl0TDJFdlFVTm5PRzlqU2xacVpURTNVUzE2VFVoc2FGZGtUbkI0ZEdaUGVYbEJOMHRSYUZCSFh6ZE9iWGs1YUdwaFIzSlllVlI1YmxsblBYTTVOaTFqSWl3aVpXMWhhV3dpT2lKdFpXWjZZWEpoYzJoQVoyMWhhV3d1WTI5dElpd2laVzFoYVd4ZmRtVnlhV1pwWldRaU9uUnlkV1VzSW1aMWJHeGZibUZ0WlNJNklrMTFhR0Z0YldGa0lFWmhjbkpsYkNJc0ltbHpjeUk2SW1oMGRIQnpPaTh2WVdOamIzVnVkSE11WjI5dloyeGxMbU52YlNJc0ltNWhiV1VpT2lKTmRXaGhiVzFoWkNCR1lYSnlaV3dpTENKd2FHOXVaVjkyWlhKcFptbGxaQ0k2Wm1Gc2MyVXNJbkJwWTNSMWNtVWlPaUpvZEhSd2N6b3ZMMnhvTXk1bmIyOW5iR1YxYzJWeVkyOXVkR1Z1ZEM1amIyMHZZUzlCUTJjNGIyTktWbXBsTVRkUkxYcE5TR3hvVjJST2NIaDBaazk1ZVVFM1MxRm9VRWRmTjA1dGVUbG9hbUZIY2xoNVZIbHVXV2M5Y3prMkxXTWlMQ0p3Y205MmFXUmxjbDlwWkNJNklqRXdNakUyTURrd05qTTVNVFV4TnpVeE5ETTVPQ0lzSW5OMVlpSTZJakV3TWpFMk1Ea3dOak01TVRVeE56VXhORE01T0NKOUxDSnliMnhsSWpvaVlYVjBhR1Z1ZEdsallYUmxaQ0lzSW1GaGJDSTZJbUZoYkRFaUxDSmhiWElpT2x0N0ltMWxkR2h2WkNJNkltOWhkWFJvSWl3aWRHbHRaWE4wWVcxd0lqb3hOemMzT0RBMk1qRXpmVjBzSW5ObGMzTnBiMjVmYVdRaU9pSmpaVFl4TURRd1pTMWlNekE0TFRRM01qY3RZV0V6WWkwM1pERmlOR1l6TW1Oak9XUWlMQ0pwYzE5aGJtOXVlVzF2ZFhNaU9tWmhiSE5sZlEuUURfSm9zUUVFRS1Pb2xyT09VRmZBRzc5czdzNFNZREhiQ3doWkNReV80SWVlV2tXZlNNdS1WaU5fbUVBa3k2a2k3Z1J0elVJVVJFM2VnZ29WVkFZb3ciLCJ0b2tlbl90eXBlIjoiYmVhcmVyIiwiZXhwaXJlc19pbiI6MzYwMCwiZXhwaXJlc19hdCI6MTc3NzgwOTgxMywicmVmcmVzaF90b2tlbiI6Imd3cGh1ZGpqaG56biIsInVzZXIiOnsiaWQiOiI2ODBkZjIzZC0wNDc5LTQ3MmMtODU0Zi1hODRkZjY1ODEyZTgiLCJhdWQiOiJhdXRoZW50aWNhdGVkIiwicm9sZSI6ImF1dGhlbnRpY2F0ZWQiLCJlbWFpbCI6Im1lZnphcmFzaEBnbWFpbC5jb20iLCJlbWFpbF9jb25maXJtZWRfYXQiOiIyMDI2LTA1LTAzVDEwOjMwOjU2LjI0MzU2OFoiLCJwaG9uZSI6IiIsImNvbmZpcm1lZF9hdCI6IjIwMjYtMDUtMDNUMTA6MzA6NTYuMjQzNTY4WiIsImxhc3Rfc2lnbl9pbl9hdCI6IjIwMjYtMDUtMDNUMTE6MDM6MzMuODAzMDIxNDQ1WiIsImFwcF9tZXRhZGF0YSI6eyJwcm92aWRlciI6Imdvb2dsZSIsInByb3ZpZGVycyI6WyJnb29nbGUiXX0sInVzZXJfbWV0YWRhdGEiOnsiYXZhdGFyX3VybCI6Imh0dHBzOi8vbGgzLmdvb2dsZXVzZXJjb250ZW50LmNvbS9hL0FDZzhvY0pWamUxN1Etek1IbGhXZE5weHRmT3l5QTdLUWhQR183Tm15OWhqYUdyWHlUeW5ZZz1zOTYtYyIsImVtYWlsIjoibWVmemFyYXNoQGdtYWlsLmNvbSIsImVtYWlsX3ZlcmlmaWVkIjp0cnVlLCJmdWxsX25hbWUiOiJNdWhhbW1hZCBGYXJyZWwiLCJpc3MiOiJodHRwczovL2FjY291bnRzLmdvb2dsZS5jb20iLCJuYW1lIjoiTXVoYW1tYWQgRmFycmVsIiwicGhvbmVfdmVyaWZpZWQiOmZhbHNlLCJwaWN0dXJlIjoiaHR0cHM6Ly9saDMuZ29vZ2xldXNlcmNvbnRlbnQuY29tL2EvQUNnOG9jSlZqZTE3US16TUhsaFdkTnB4dGZPeXlBN0tRaFBHXzdObXk5aGphR3JYeVR5bllnPXM5Ni1jIiwicHJvdmlkZXJfaWQiOiIxMDIxNjA5MDYzOTE1MTc1MTQzOTgiLCJzdWIiOiIxMDIxNjA5MDYzOTE1MTc1MTQzOTgifSwiaWRlbnRpdGllcyI6W3siaWRlbnRpdHlfaWQiOiI5NTlkZDg4ZS1iNWFhLTQzMWEtYjMzYi1lODZhMWFjZGNmZWQiLCJpZCI6IjEwMjE2MDkwNjM5MTUxNzUxNDM5OCIsInVzZXJfaWQiOiI2ODBkZjIzZC0wNDc5LTQ3MmMtODU0Zi1hODRkZjY1ODEyZTgiLCJpZGVudGl0eV9kYXRhIjp7ImF2YXRhcl91cmwiOiJodHRwczovL2xoMy5nb29nbGV1c2VyY29udGVudC5jb20vYS9BQ2c4b2NKVmplMTdRLXpNSGxoV2ROcHh0Zk95eUE3S1FoUEdfN05teTloamFHclh5VHluWWc9czk2LWMiLCJlbWFpbCI6Im1lZnphcmFzaEBnbWFpbC5jb20iLCJlbWFpbF92ZXJpZmllZCI6dHJ1ZSwiZnVsbF9uYW1lIjoiTXVoYW1tYWQgRmFycmVsIiwiaXNzIjoiaHR0cHM6Ly9hY2NvdW50cy5nb29nbGUuY29tIiwibmFtZSI6Ik11aGFtbWFkIEZhcnJlbCIsInBob25lX3ZlcmlmaWVkIjpmYWxzZSwicGljdHVyZSI6Imh0dHBzOi8vbGgzLmdvb2dsZXVzZXJjb250ZW50LmNvbS9hL0FDZzhvY0pWamUxN1Etek1IbGhXZE5weHRmT3l5QTdLUWhQR183Tm15OWhqYUdyWHlUeW5ZZz1zOTYtYyIsInByb3ZpZGVyX2lkIjoiMTAyMTYwOTA2MzkxNTE3NTE0Mzk4Iiwic3ViIjoiMTAyMTYwOTA2MzkxNTE3NTE0Mzk4In0sInByb3ZpZGVyIjoiZ29vZ2xlIiwibGFzdF9zaWduX2luX2F0IjoiMjAyNi0wNS0wM1QxMTowMzozMy43MDMzMjY3NjJaIn1dLCJjcmVhdGVkX2F0IjoiMjAyNi0wNS0wM1QxMDozMDo1Ni4yMzg1NzNaIiwidXBkYXRlZF9hdCI6IjIwMjYtMDUtMDNUMTE6MDM6MzMuODA4NDE5WiIsImlzX2Fub255bW91cyI6ZmFsc2V9fQ=="
+
+Write-Host "Cookie loaded, menjalankan test..." -ForegroundColor Cyan
+
+# ─── TEST: GET /api/session/my-sessions ──────────────────────────────────────
+Write-Host ""
+Write-Host "[TEST] GET /api/session/my-sessions" -ForegroundColor Yellow
+$r1 = curl.exe -s -w "`nHTTP %{http_code}" -H "Cookie: $COOKIE" "$BASE/api/session/my-sessions"
+Write-Host $r1
+
+# ─── TEST: POST /api/session/create ──────────────────────────────────────────
+Write-Host ""
+Write-Host "[TEST] POST /api/session/create" -ForegroundColor Yellow
+$json = curl.exe -s `
+  -X POST `
+  -H "Content-Type: application/json" `
+  -H "Cookie: $COOKIE" `
+  -d '{"title":"Kelas Matematika Hari Ini"}' `
+  "$BASE/api/session/create"
+
+Write-Host "Response: $json"
+
+$pin = ($json | ConvertFrom-Json -ErrorAction SilentlyContinue).pin
+if ($pin) {
+  Write-Host "PIN didapat: $pin" -ForegroundColor Green
+
+  Write-Host ""
+  Write-Host "[TEST] GET /api/session/$pin (verifikasi PIN lookup)" -ForegroundColor Yellow
+  $r3 = curl.exe -s -w "`nHTTP %{http_code}" "$BASE/api/session/$pin"
+  Write-Host $r3
+} else {
+  Write-Host "Tidak dapat PIN dari response create." -ForegroundColor Red
+}
+
+Write-Host ""
+Write-Host "Done." -ForegroundColor Green
