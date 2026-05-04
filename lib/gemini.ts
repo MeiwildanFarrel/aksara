@@ -4,9 +4,29 @@ import Groq from 'groq-sdk'
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!)
 
 export async function generateEmbedding(text: string): Promise<number[]> {
-  const model = genAI.getGenerativeModel({ model: 'embedding-001' })
-  const result = await model.embedContent(text)
-  return result.embedding.values
+  // gemini-embedding-2 with outputDimensionality=768 keeps the vector(768) schema intact.
+  // The SDK types don't expose outputDimensionality, so we use fetch directly.
+  const url =
+    `https://generativelanguage.googleapis.com/v1beta/models/gemini-embedding-2:embedContent` +
+    `?key=${process.env.GEMINI_API_KEY}`
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      model: 'models/gemini-embedding-2',
+      content: { parts: [{ text }] },
+      outputDimensionality: 768,
+    }),
+  })
+  if (!res.ok) {
+    const err = (await res.json()) as { error?: { message?: string } }
+    throw Object.assign(
+      new Error(err.error?.message ?? `HTTP ${res.status}`),
+      { status: res.status },
+    )
+  }
+  const data = (await res.json()) as { embedding: { values: number[] } }
+  return data.embedding.values
 }
 
 export async function generateText(prompt: string): Promise<string> {

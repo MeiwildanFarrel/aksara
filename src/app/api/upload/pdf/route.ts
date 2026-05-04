@@ -4,13 +4,7 @@ import { createClient } from '../../../../../lib/supabase/server'
 import { chunkText } from '../../../../../lib/chunker'
 import { generateEmbedding } from '../../../../../lib/gemini'
 import type { Database } from '../../../../../types/supabase'
-
-export const runtime = 'nodejs'
-
-// pdf-parse has no TypeScript declarations; assign type manually
-// eslint-disable-next-line @typescript-eslint/no-require-imports
-const pdfParse: (buf: Buffer) => Promise<{ text: string; numpages: number }> =
-  require('pdf-parse')
+import { extractText } from 'unpdf'
 
 const MAX_FILE_SIZE = 10 * 1024 * 1024 // 10 MB
 
@@ -70,9 +64,11 @@ export async function POST(request: NextRequest) {
     }
 
     // 5. Extract text from PDF
-    const arrayBuffer = await file.arrayBuffer()
-    const pdfData = await pdfParse(Buffer.from(arrayBuffer))
-    const { text, numpages } = pdfData
+    const buffer = await file.arrayBuffer()
+    const { text, totalPages: numpages } = await extractText(
+      new Uint8Array(buffer),
+      { mergePages: true },
+    )
 
     if (!text.trim()) {
       return NextResponse.json(
