@@ -25,18 +25,25 @@ export const PRIOR_MASTERY = P_L0
  * Result is clamped to [0, 1].
  */
 export function updateMastery(currentScore: number, isCorrect: boolean): number {
+  // Clamp input agar formula tidak meledak jika DB sempat berisi nilai aneh.
+  const score =
+    Number.isFinite(currentScore)
+      ? Math.max(0, Math.min(1, currentScore))
+      : PRIOR_MASTERY
+
   let posterior: number
 
   if (isCorrect) {
-    const pCorrect = currentScore * (1 - P_S) + (1 - currentScore) * P_G
-    posterior = (currentScore * (1 - P_S)) / pCorrect
+    const pCorrect = score * (1 - P_S) + (1 - score) * P_G
+    posterior = pCorrect > 0 ? (score * (1 - P_S)) / pCorrect : score
   } else {
-    const pWrong = currentScore * P_S + (1 - currentScore) * (1 - P_G)
-    posterior = (currentScore * P_S) / pWrong
+    const pWrong = score * P_S + (1 - score) * (1 - P_G)
+    posterior = pWrong > 0 ? (score * P_S) / pWrong : score
   }
 
   const newScore = posterior + (1 - posterior) * P_T
 
+  if (!Number.isFinite(newScore)) return PRIOR_MASTERY
   if (newScore < 0) return 0
   if (newScore > 1) return 1
   return newScore

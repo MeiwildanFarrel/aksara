@@ -5,7 +5,8 @@
       "Bash(npx tsc *)",
       "Bash(npx ts-node *)",
       "Bash(npm uninstall *)",
-      "Bash(Select-String -Pattern \"bkt\\\\.ts|quest\")"
+      "Bash(Select-String -Pattern \"bkt\\\\.ts|quest\")",
+      "Bash(npx next *)"
     ]
   }
 }

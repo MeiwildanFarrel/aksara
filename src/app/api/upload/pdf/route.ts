@@ -119,6 +119,13 @@ export async function POST(request: NextRequest) {
       console.log(`[upload/pdf] chunk ${i + 1}/${chunks.length} done`)
     }
 
+    if (chunks.length > 0 && insertedCount === 0) {
+      return NextResponse.json(
+        { error: 'Gagal menyimpan satupun chunk PDF.' },
+        { status: 500 },
+      )
+    }
+
     return NextResponse.json(
       { success: true, chunks_created: insertedCount, session_id: sessionId },
       { status: 201 }
