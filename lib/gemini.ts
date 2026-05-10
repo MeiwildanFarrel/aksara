@@ -48,3 +48,27 @@ export async function generateText(prompt: string): Promise<string> {
     return completion.choices[0]?.message?.content ?? ''
   }
 }
+
+export async function generateJson(prompt: string): Promise<string> {
+  try {
+    const model = genAI.getGenerativeModel({
+      model: 'gemini-2.5-flash',
+      generationConfig: { responseMimeType: 'application/json' },
+    })
+    const result = await model.generateContent(prompt)
+    return result.response.text()
+  } catch (err) {
+    const status = (err as { status?: number })?.status
+    if (status !== 429) throw err
+
+    // Fallback to Groq on rate limit; force JSON via response_format
+    console.warn('[gemini] rate-limited (429), falling back to Groq (JSON)')
+    const groq = new Groq({ apiKey: process.env.GROQ_API_KEY! })
+    const completion = await groq.chat.completions.create({
+      model: 'llama-3.3-70b-versatile',
+      messages: [{ role: 'user', content: prompt }],
+      response_format: { type: 'json_object' },
+    })
+    return completion.choices[0]?.message?.content ?? ''
+  }
+}
