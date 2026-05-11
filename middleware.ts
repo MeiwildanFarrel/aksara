@@ -6,7 +6,7 @@ import type { Database } from './types/supabase'
 const PUBLIC_ROUTES = ['/', '/login', '/auth/callback', '/join']
 
 // Prefix route yang butuh login
-const PROTECTED_PREFIXES = ['/dashboard', '/api/protected']
+const PROTECTED_PREFIXES = ['/dashboard', '/onboarding', '/session', '/api/protected']
 
 export async function middleware(request: NextRequest) {
   let supabaseResponse = NextResponse.next({ request })
@@ -51,11 +51,11 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(loginUrl)
   }
 
-  // Sudah login dan mencoba akses /login → redirect /dashboard
+  // Sudah login dan mencoba akses /login → redirect /onboarding
   if (user && pathname === '/login') {
-    const dashboardUrl = request.nextUrl.clone()
-    dashboardUrl.pathname = '/dashboard'
-    return NextResponse.redirect(dashboardUrl)
+    const onboardingUrl = request.nextUrl.clone()
+    onboardingUrl.pathname = '/onboarding'
+    return NextResponse.redirect(onboardingUrl)
   }
 
   return supabaseResponse

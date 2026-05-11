@@ -2,26 +2,415 @@
 @tailwind components;
 @tailwind utilities;
 
+@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap');
+
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  /* ── Base (putih & surface) ── */
+  --background: #FBF7F0;
+  --surface: #FFFFFF;
+  --surface-alt: #F5EFE4;
+  --sand-light: #EDE4D3;
+  
+  /* ── Primary Emas ── */
+  --accent-gold: #C8922A;
+  --accent-gold-deep: #A67520;
+  --accent-gold-bright: #E8B84B;
+  --accent-gold-tint: #FAE8B0;
+  
+  /* ── Teks & Struktur ── */
+  --text-primary: #2C1A08;
+  --text-secondary: #5C3D1A;
+  --text-muted: #8B6340;
+  --text-tan: #C4A882;
+
+  /* ── Borders ── */
+  --border-light: #EDE4D3;
+  --border-dark: #C4A882;
+
+  /* ── Mastery ── */
+  --mastery-dikuasai: #2E7D4F;
+  --mastery-aktif: #C8922A;
+  --mastery-lemah: #C0392B;
+  --mastery-terkunci: #C4A882;
+
+  /* ── Shadows ── */
+  --shadow-gold: 0 4px 20px rgba(200, 146, 42, 0.15);
+  --shadow-card: 0 2px 16px rgba(44, 26, 8, 0.06);
+  --shadow-card-hover: 0 8px 30px rgba(44, 26, 8, 0.10);
+  --shadow-float: 0 20px 50px rgba(44, 26, 8, 0.12);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
-}
+/* ═══════════════════════════════════════════════
+   BASE STYLES
+   ═══════════════════════════════════════════════ */
 
 body {
-  color: var(--foreground);
-  background: var(--background);
-  font-family: Arial, Helvetica, sans-serif;
+  background-color: var(--background);
+  color: var(--text-primary);
+  font-family: var(--font-jakarta), 'Plus Jakarta Sans', sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
-@layer utilities {
-  .text-balance {
-    text-wrap: balance;
+h1, h2, h3, h4, h5, h6 {
+  font-family: var(--font-playfair), 'Playfair Display', serif;
+  font-weight: 500;
+  color: var(--text-primary);
+}
+
+p, span, label, button, input, textarea, select, a {
+  font-family: var(--font-jakarta), 'Plus Jakarta Sans', sans-serif;
+}
+
+::selection {
+  background-color: var(--accent-gold);
+  color: white;
+}
+
+/* ═══════════════════════════════════════════════
+   GLASS COMPONENTS
+   ═══════════════════════════════════════════════ */
+
+@layer components {
+  .glass-card {
+    @apply bg-white/80 backdrop-blur-md border shadow-sm;
+    border-color: var(--border-light);
+    box-shadow: var(--shadow-card);
+    transition: all 0.35s cubic-bezier(0.4, 0, 0.2, 1);
   }
+  
+  .glass-card:hover {
+    box-shadow: var(--shadow-card-hover);
+  }
+  
+  .glass-strong {
+    @apply bg-white/95 backdrop-blur-xl border;
+    border-color: var(--border-light);
+    box-shadow: var(--shadow-float);
+  }
+
+  /* ── Gold Accent Button ── */
+  .btn-gold {
+    @apply inline-flex items-center justify-center gap-2 rounded-xl px-6 py-3 text-sm font-semibold text-white transition-all;
+    background: linear-gradient(135deg, var(--accent-gold) 0%, var(--accent-gold-deep) 100%);
+    box-shadow: 0 4px 14px rgba(200, 146, 42, 0.25), inset 0 1px 0 rgba(255, 255, 255, 0.15);
+  }
+  
+  .btn-gold:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 6px 20px rgba(200, 146, 42, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.2);
+    background: linear-gradient(135deg, var(--accent-gold-bright) 0%, var(--accent-gold) 100%);
+  }
+  
+  .btn-gold:active {
+    transform: translateY(0);
+  }
+
+  .btn-gold:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    transform: none;
+  }
+
+  /* ── Outline Button ── */
+  .btn-outline {
+    @apply inline-flex items-center justify-center gap-2 rounded-xl border px-6 py-3 text-sm font-medium transition-all;
+    border-color: var(--border-light);
+    color: var(--text-primary);
+    background: var(--surface);
+  }
+  
+  .btn-outline:hover {
+    background: var(--surface-alt);
+    border-color: var(--border-dark);
+    transform: translateY(-1px);
+  }
+
+  /* ── Lontar Decorative Pattern ── */
+  .lontar-pattern {
+    position: relative;
+    overflow: hidden;
+  }
+
+  .lontar-pattern::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    opacity: 0.03;
+    background-image: 
+      radial-gradient(circle at 25% 25%, var(--accent-gold) 1px, transparent 1px),
+      radial-gradient(circle at 75% 75%, var(--accent-gold) 1px, transparent 1px);
+    background-size: 30px 30px;
+    pointer-events: none;
+  }
+
+  /* ── Divider Gold ── */
+  .divider-gold {
+    height: 2px;
+    background: linear-gradient(90deg, transparent, var(--accent-gold), transparent);
+    border: none;
+    margin: 2rem 0;
+  }
+
+  /* ── Section Header ── */
+  .section-header {
+    position: relative;
+    padding-left: 1rem;
+  }
+
+  .section-header::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 0.25em;
+    bottom: 0.25em;
+    width: 3px;
+    border-radius: 2px;
+    background: linear-gradient(180deg, var(--accent-gold), var(--accent-gold-deep));
+  }
+
+  /* ── Status Badge ── */
+  .badge-dikuasai {
+    @apply inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-bold;
+    background: rgba(46, 125, 79, 0.1);
+    color: var(--mastery-dikuasai);
+    border: 1px solid rgba(46, 125, 79, 0.2);
+  }
+
+  .badge-aktif {
+    @apply inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-bold;
+    background: rgba(200, 146, 42, 0.1);
+    color: var(--mastery-aktif);
+    border: 1px solid rgba(200, 146, 42, 0.2);
+  }
+
+  .badge-lemah {
+    @apply inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-bold;
+    background: rgba(192, 57, 43, 0.1);
+    color: var(--mastery-lemah);
+    border: 1px solid rgba(192, 57, 43, 0.2);
+  }
+
+  .badge-terkunci {
+    @apply inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-bold;
+    background: rgba(196, 168, 130, 0.15);
+    color: var(--mastery-terkunci);
+    border: 1px solid rgba(196, 168, 130, 0.3);
+  }
+
+  /* ── Input Field ── */
+  .input-lontar {
+    @apply w-full rounded-xl border px-4 py-3 text-sm outline-none transition-all;
+    border-color: var(--border-light);
+    background: var(--background);
+    color: var(--text-primary);
+    font-family: var(--font-jakarta), 'Plus Jakarta Sans', sans-serif;
+  }
+
+  .input-lontar:focus {
+    border-color: var(--accent-gold);
+    box-shadow: 0 0 0 3px rgba(200, 146, 42, 0.12);
+  }
+
+  .input-lontar::placeholder {
+    color: var(--text-tan);
+  }
+}
+
+/* ═══════════════════════════════════════════════
+   UTILITY CLASSES
+   ═══════════════════════════════════════════════ */
+
+@layer utilities {
+  .text-gradient-gold {
+    @apply bg-gradient-to-r from-deep-gold to-golden-ink bg-clip-text text-transparent;
+  }
+
+  .text-gradient-gold-wide {
+    background: linear-gradient(135deg, var(--accent-gold-deep) 0%, var(--accent-gold) 40%, var(--accent-gold-bright) 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+
+  .bg-gradient-gold {
+    background: linear-gradient(135deg, var(--accent-gold) 0%, var(--accent-gold-deep) 100%);
+  }
+
+  /* ── Decorative Blurs ── */
+  .bg-orb-gold {
+    position: absolute;
+    border-radius: 50%;
+    filter: blur(100px);
+    background: var(--accent-gold);
+    opacity: 0.08;
+    pointer-events: none;
+  }
+
+  .bg-orb-warm {
+    position: absolute;
+    border-radius: 50%;
+    filter: blur(120px);
+    background: var(--surface-alt);
+    opacity: 0.6;
+    pointer-events: none;
+  }
+
+  /* ── Shimmer Effect ── */
+  .shimmer {
+    position: relative;
+    overflow: hidden;
+  }
+
+  .shimmer::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(200, 146, 42, 0.06), transparent);
+    animation: shimmer 3s ease-in-out infinite;
+  }
+
+  @keyframes shimmer {
+    0% { left: -100%; }
+    100% { left: 100%; }
+  }
+
+  /* ── Gold Underline Accent ── */
+  .underline-gold {
+    position: relative;
+    display: inline-block;
+  }
+
+  .underline-gold::after {
+    content: '';
+    position: absolute;
+    bottom: -4px;
+    left: 0;
+    width: 100%;
+    height: 3px;
+    border-radius: 2px;
+    background: linear-gradient(90deg, var(--accent-gold), var(--accent-gold-bright));
+  }
+}
+
+/* ═══════════════════════════════════════════════
+   ANIMATIONS
+   ═══════════════════════════════════════════════ */
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes fadeInUp {
+  from { opacity: 0; transform: translateY(16px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes fadeInDown {
+  from { opacity: 0; transform: translateY(-16px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes scaleIn {
+  from { opacity: 0; transform: scale(0.92); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+@keyframes slideInLeft {
+  from { opacity: 0; transform: translateX(-20px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes slideInRight {
+  from { opacity: 0; transform: translateX(20px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-8px); }
+}
+
+@keyframes pulse-gold {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(200, 146, 42, 0.3); }
+  50% { box-shadow: 0 0 0 12px rgba(200, 146, 42, 0); }
+}
+
+@keyframes spin-slow {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+.animate-fade-in { animation: fadeIn 0.5s ease-out forwards; }
+.animate-fade-in-up { animation: fadeInUp 0.6s ease-out forwards; }
+.animate-fade-in-down { animation: fadeInDown 0.5s ease-out forwards; }
+.animate-scale-in { animation: scaleIn 0.4s cubic-bezier(0.4, 0, 0.2, 1) forwards; }
+.animate-slide-left { animation: slideInLeft 0.5s ease-out forwards; }
+.animate-slide-right { animation: slideInRight 0.5s ease-out forwards; }
+.animate-float { animation: float 4s ease-in-out infinite; }
+.animate-pulse-gold { animation: pulse-gold 2s ease-in-out infinite; }
+.animate-spin-slow { animation: spin-slow 20s linear infinite; }
+
+/* Stagger delay utilities */
+.delay-100 { animation-delay: 0.1s; }
+.delay-200 { animation-delay: 0.2s; }
+.delay-300 { animation-delay: 0.3s; }
+.delay-400 { animation-delay: 0.4s; }
+.delay-500 { animation-delay: 0.5s; }
+
+/* ═══════════════════════════════════════════════
+   SCROLLBAR
+   ═══════════════════════════════════════════════ */
+
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--background);
+}
+ 
+::-webkit-scrollbar-thumb {
+  background: var(--text-tan);
+  border-radius: 100px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--accent-gold-deep);
+}
+
+/* Firefox */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--text-tan) var(--background);
+}
+
+/* ═══════════════════════════════════════════════
+   PROSE OVERRIDES (for markdown)
+   ═══════════════════════════════════════════════ */
+
+.prose {
+  --tw-prose-body: var(--text-secondary);
+  --tw-prose-headings: var(--text-primary);
+  --tw-prose-links: var(--accent-gold);
+  --tw-prose-bold: var(--text-primary);
+  --tw-prose-counters: var(--text-muted);
+  --tw-prose-bullets: var(--accent-gold);
+  --tw-prose-code: var(--text-primary);
+}
+
+.prose code {
+  background: var(--surface-alt);
+  padding: 0.2em 0.4em;
+  border-radius: 0.375rem;
+  font-size: 0.875em;
+  border: 1px solid var(--border-light);
 }
