@@ -58,7 +58,7 @@ function SettingsProfilePage() {
         return
       }
 
-      const res = await fetch('/api/user/me')
+      const res = await fetch('/api/user/me', { cache: 'no-store' })
       if (res.ok) {
         const data = await res.json()
         setUser(data)
@@ -162,6 +162,7 @@ function SettingsProfilePage() {
     try {
       const res = await fetch('/api/user/profile', {
         method: 'PATCH',
+        cache: 'no-store',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ full_name: fullName, email, avatar_url: avatarUrl, university, phone, research_field: researchField })
       })
@@ -171,9 +172,11 @@ function SettingsProfilePage() {
         throw new Error(data.error || 'Gagal menyimpan profil')
       }
 
+      const data = await res.json().catch(() => null)
+
       setSuccess(true)
       setTimeout(() => setSuccess(false), 3000)
-      setUser(prev => prev ? { ...prev, full_name: fullName, avatar_url: avatarUrl } : null)
+      setUser(prev => prev ? { ...prev, ...(data?.user ?? {}), full_name: fullName, avatar_url: avatarUrl } : null)
       
       // If first time, redirect to dashboard
       if (isFirstTime) {
@@ -237,7 +240,7 @@ function SettingsProfilePage() {
               <BarChart2 size={18} /> ANALYTICS
             </button>
             <button onClick={() => router.push('/dashboard/instructor/cognitive')} className="flex items-center gap-3 w-full hover:bg-[#F3D580]/30 text-[#8B6340] rounded-xl px-4 py-3 font-medium transition-all">
-              <BrainCircuit size={18} /> COGNITIVE DASHBOARD
+              <BrainCircuit size={18} /> COGNITIVE
             </button>
           </nav>
         </div>

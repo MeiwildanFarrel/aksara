@@ -13,7 +13,6 @@ import helpIcon from '../../public/help.png'
 import logoutIcon from '../../public/logout.png'
 import studentIcon from '../../public/student.png'
 import bookIcon from '../../public/book.png'
-import ratingIcon from '../../public/rating.png'
 
 interface Session {
   id: string
@@ -30,6 +29,7 @@ interface UserData {
   role: string
   full_name?: string
   avatar_url?: string
+  university?: string
 }
 
 export default function InstructorDashboard() {
@@ -41,7 +41,7 @@ export default function InstructorDashboard() {
   const [newTitle, setNewTitle] = useState('')
   const [isCreating, setIsCreating] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [stats, setStats] = useState({ activeStudents: 0, avgRating: 4.8 })
+  const [stats, setStats] = useState({ activeStudents: 0 })
 
   useEffect(() => {
     // Check if we need to open the create modal from query params
@@ -158,7 +158,7 @@ export default function InstructorDashboard() {
               )}
             </div>
             <h2 className="font-heading text-xl font-bold text-[#5C3D1A] text-center">{user?.full_name || 'Dosen'}</h2>
-            <p className="text-sm text-[#8B6340]">Senior Lecturer</p>
+            <p className="text-sm text-[#8B6340]">{user?.university || 'Akademisi'}</p>
           </div>
 
           <nav className="flex flex-col gap-2">
@@ -184,7 +184,7 @@ export default function InstructorDashboard() {
               onClick={() => router.push('/dashboard/instructor/cognitive')}
               className="flex items-center gap-3 w-full hover:bg-[#F3D580]/30 text-[#8B6340] rounded-xl px-4 py-3 font-medium transition-all">
               <BrainCircuit size={18} />
-              COGNITIVE DASHBOARD
+              COGNITIVE
             </button>
           </nav>
         </div>
@@ -225,7 +225,7 @@ export default function InstructorDashboard() {
           </div>
 
           {/* Stats Cards */}
-          <div className="grid grid-cols-3 gap-6 mb-12">
+          <div className="grid grid-cols-2 gap-6 mb-12">
             <div className="bg-white rounded-2xl p-6 border border-[#F0E5D5] shadow-sm flex flex-col justify-between">
               <div className="flex items-center gap-4 mb-4">
                 <div className="w-10 h-10 rounded-full bg-[#FFF0D4] flex items-center justify-center">
@@ -258,21 +258,6 @@ export default function InstructorDashboard() {
               </div>
             </div>
 
-            <div className="bg-white rounded-2xl p-6 border border-[#F0E5D5] shadow-sm flex flex-col justify-between">
-              <div className="flex items-center gap-4 mb-4">
-                <div className="w-10 h-10 rounded-full bg-[#FFF0D4] flex items-center justify-center">
-                  <Image src={ratingIcon} alt="Rating" width={20} height={20} />
-                </div>
-                <span className="font-medium text-[#5C3D1A] whitespace-nowrap">Avg. Rating</span>
-              </div>
-              <div>
-                <div className="font-heading text-4xl font-bold text-[#2C1A08] mb-1">{stats.avgRating.toFixed(1)}</div>
-                <div className="text-xs text-[#2E7D4F] flex items-center gap-1 font-medium">
-                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M23 6l-9.5 9.5-5-5L1 18"/><path d="M17 6h6v6"/></svg>
-                  +0.2 from last month
-                </div>
-              </div>
-            </div>
           </div>
 
           {/* Sesi Aktif */}

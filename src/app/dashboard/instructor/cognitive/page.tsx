@@ -16,6 +16,7 @@ type UserData = {
   role: string
   full_name?: string
   avatar_url?: string
+  university?: string
 }
 
 type Course = {
@@ -189,7 +190,7 @@ export default function CognitiveDashboardPage() {
               )}
             </div>
             <h2 className="font-heading text-xl font-bold text-[#5C3D1A] text-center">{user?.full_name || 'Dosen'}</h2>
-            <p className="text-sm text-[#8B6340]">Senior Lecturer</p>
+            <p className="text-sm text-[#8B6340]">{user?.university || 'Akademisi'}</p>
           </div>
 
           <nav className="flex flex-col gap-2">
@@ -207,7 +208,7 @@ export default function CognitiveDashboardPage() {
             </button>
             <button className="flex items-center gap-3 w-full bg-[#F3D580] text-[#5C3D1A] rounded-xl px-4 py-3 font-semibold transition-all">
               <BrainCircuit size={18} />
-              COGNITIVE DASHBOARD
+              COGNITIVE
             </button>
           </nav>
         </div>

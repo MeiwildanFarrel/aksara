@@ -1,6 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '../../../../../lib/supabase/server'
 
+export const dynamic = 'force-dynamic'
+
+const noStoreHeaders = {
+  'Cache-Control': 'no-store, no-cache, must-revalidate, max-age=0',
+}
+
 export async function GET(request: NextRequest) {
   try {
     const supabase = await createClient()
@@ -12,7 +18,7 @@ export async function GET(request: NextRequest) {
     } = await supabase.auth.getUser()
 
     if (authError || !user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401, headers: noStoreHeaders })
     }
 
     // 2. Cek apakah user sudah ada di tabel public.users
@@ -25,7 +31,7 @@ export async function GET(request: NextRequest) {
     if (queryError) {
       return NextResponse.json(
         { error: 'Gagal mengambil data user.', detail: queryError.message },
-        { status: 500 },
+        { status: 500, headers: noStoreHeaders },
       )
     }
 
@@ -33,10 +39,11 @@ export async function GET(request: NextRequest) {
     if (existingUser) {
       return NextResponse.json({
         ...existingUser,
-        // prefer DB values (updated via /api/user/profile), fallback to auth metadata
-        full_name: existingUser.full_name || user.user_metadata?.full_name || null,
-        avatar_url: existingUser.avatar_url || user.user_metadata?.avatar_url || null,
-      })
+        // Keep avatars out of Auth metadata; large data URLs there inflate SSR cookies.
+        full_name: user.user_metadata?.full_name ?? existingUser.full_name ?? null,
+        avatar_url: existingUser.avatar_url ?? null,
+        university: user.user_metadata?.university ?? null,
+      }, { headers: noStoreHeaders })
     }
 
     // 4. Belum ada di tabel
@@ -46,7 +53,7 @@ export async function GET(request: NextRequest) {
     // Jika tidak ada parameter role (hanya mengecek apakah user sudah ada),
     // kita kembalikan status 200 dengan info bahwa role belum di-set.
     if (!rawRole) {
-      return NextResponse.json({ exists: false, role: null }, { status: 200 })
+      return NextResponse.json({ exists: false, role: null }, { status: 200, headers: noStoreHeaders })
     }
 
     // Jika ada parameter role, berarti dipanggil saat proses submit onboarding
@@ -70,10 +77,10 @@ export async function GET(request: NextRequest) {
       )
     }
 
-    return NextResponse.json(newUser, { status: 201 })
+    return NextResponse.json(newUser, { status: 201, headers: noStoreHeaders })
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Internal server error'
     console.error('[user/me] fatal:', message)
-    return NextResponse.json({ error: message }, { status: 500 })
+    return NextResponse.json({ error: message }, { status: 500, headers: noStoreHeaders })
   }
 }

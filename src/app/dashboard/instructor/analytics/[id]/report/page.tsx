@@ -20,6 +20,7 @@ interface UserData {
   id: string
   full_name?: string
   avatar_url?: string
+  university?: string
 }
 
 export default function AnalyticsReportPage({ params }: { params: { id: string } }) {
@@ -152,7 +153,7 @@ export default function AnalyticsReportPage({ params }: { params: { id: string }
               )}
             </div>
             <h2 className="font-heading text-xl font-bold text-[#5C3D1A] text-center">{user?.full_name || 'Dosen'}</h2>
-            <p className="text-sm text-[#8B6340]">Senior Lecturer</p>
+            <p className="text-sm text-[#8B6340]">{user?.university || 'Akademisi'}</p>
           </div>
 
           <nav className="flex flex-col gap-2">
@@ -166,7 +167,7 @@ export default function AnalyticsReportPage({ params }: { params: { id: string }
               <BarChart2 size={18} /> Analytics
             </button>
             <button onClick={() => router.push('/dashboard/instructor/cognitive')} className="flex items-center gap-3 w-full hover:bg-[#F3D580]/30 text-[#8B6340] rounded-xl px-4 py-3 font-medium transition-all">
-              <BrainCircuit size={18} /> Cognitive Dashboard
+              <BrainCircuit size={18} /> COGNITIVE
             </button>
           </nav>
         </div>
