@@ -25,6 +25,7 @@ interface SubmitResponse {
 
 interface NodeData {
   title: string
+  timer?: string
 }
 
 export default function QuestPage({ params }: { params: { pin: string, nodeId: string } }) {
@@ -33,25 +34,41 @@ export default function QuestPage({ params }: { params: { pin: string, nodeId: s
 
   const [quests, setQuests] = useState<Quest[]>([])
   const [nodeData, setNodeData] = useState<NodeData | null>(null)
+  const [sessionTitle, setSessionTitle] = useState('Session')
+  const [sessionId, setSessionId] = useState('')
+  
   const [currentIndex, setCurrentIndex] = useState(0)
-  const [selectedIndex, setSelectedIndex] = useState<number | null>(null)
+  
+  // Store answers: { [questIndex]: { selectedIndex, result, aelMode, aiInsight } }
+  const [answers, setAnswers] = useState<Record<number, { 
+    selectedIndex: number, 
+    result: SubmitResponse,
+    aelMode: string,
+    aiInsight: string | null
+  }>>({})
   
   const [isSubmitting, setIsSubmitting] = useState(false)
-  const [result, setResult] = useState<SubmitResponse | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   
-  const [strikeCount, setStrikeCount] = useState(0)
-  const [aelMode, setAelMode] = useState('standard')
-  const [isQueryingAel, setIsQueryingAel] = useState(false)
+  const [timeLeft, setTimeLeft] = useState(15 * 60) // 15 minutes default
+  const [isTimeUp, setIsTimeUp] = useState(false)
 
   useEffect(() => {
-    async function loadQuests() {
+    async function loadData() {
       try {
         const supabase = createClient()
+        
+        const sessionRes = await fetch(`/api/session/${pin}`)
+        if (sessionRes.ok) {
+          const sData = await sessionRes.json()
+          setSessionTitle(sData.title)
+          setSessionId(sData.id)
+        }
+
         const [questRes, nodeRes] = await Promise.all([
           fetch(`/api/quest/${nodeId}`),
-          supabase.from('skill_nodes').select('title').eq('id', nodeId).single()
+          supabase.from('skill_nodes').select('title, timer').eq('id', nodeId).single()
         ])
 
         if (!questRes.ok) throw new Error('Gagal memuat quest')
@@ -61,47 +78,72 @@ export default function QuestPage({ params }: { params: { pin: string, nodeId: s
         
         if (nodeRes.data) {
           setNodeData(nodeRes.data)
+          if (nodeRes.data.timer) {
+            const match = nodeRes.data.timer.match(/(\d+)/)
+            if (match) {
+              setTimeLeft(parseInt(match[1], 10) * 60)
+            }
+          }
         }
+
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Terjadi kesalahan')
       } finally {
         setIsLoading(false)
       }
     }
-    loadQuests()
-  }, [nodeId])
+    loadData()
+  }, [nodeId, pin])
 
-  async function handleSubmit() {
-    if (selectedIndex === null) return
-    const currentQuest = quests[currentIndex]
+  useEffect(() => {
+    if (isLoading || quests.length === 0 || isTimeUp) return;
+    
+    if (timeLeft <= 0) {
+      setIsTimeUp(true)
+      return;
+    }
+    
+    const t = setInterval(() => setTimeLeft(prev => prev - 1), 1000)
+    return () => clearInterval(t)
+  }, [timeLeft, isLoading, quests.length, isTimeUp])
+
+  const formatTime = (seconds: number) => {
+    const m = Math.floor(seconds / 60)
+    const s = seconds % 60
+    return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`
+  }
+
+  async function handleOptionClick(idx: number) {
+    if (answers[currentIndex] || isSubmitting || isTimeUp) return
     
     setIsSubmitting(true)
     setError(null)
 
     try {
-      const sessionRes = await fetch(`/api/session/${pin}`)
-      const sessionData = await sessionRes.json()
-
+      const currentQuest = quests[currentIndex]
       const res = await fetch('/api/quest/submit', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           quest_id: currentQuest.id,
-          selected_index: selectedIndex,
-          session_id: sessionData.id
+          selected_index: idx,
+          session_id: sessionId
         })
       })
 
       if (!res.ok) throw new Error('Gagal mengirim jawaban')
       
       const data: SubmitResponse = await res.json()
-      setResult(data)
-
-      if (!data.is_correct) {
-        setStrikeCount(prev => prev + 1)
-      } else {
-        setStrikeCount(0)
-      }
+      
+      setAnswers(prev => ({
+        ...prev,
+        [currentIndex]: {
+          selectedIndex: idx,
+          result: data,
+          aelMode: 'standard',
+          aiInsight: data.feedback
+        }
+      }))
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Terjadi kesalahan')
     } finally {
@@ -110,63 +152,72 @@ export default function QuestPage({ params }: { params: { pin: string, nodeId: s
   }
 
   async function handleAelQuery(mode: string) {
-    setAelMode(mode)
-    setIsQueryingAel(true)
+    const currentAns = answers[currentIndex]
+    if (!currentAns) return
+    
+    // Optimistic update mode
+    setAnswers(prev => ({
+      ...prev,
+      [currentIndex]: { ...prev[currentIndex], aelMode: mode, aiInsight: null }
+    }))
     
     try {
-      const sessionRes = await fetch(`/api/session/${pin}`)
-      const sessionData = await sessionRes.json()
-
       const res = await fetch('/api/ael/query', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           query: quests[currentIndex].question,
-          session_id: sessionData.id,
+          session_id: sessionId,
           mode
         })
       })
 
       if (res.ok) {
         const data = await res.json()
-        setResult(prev => prev ? { ...prev, feedback: data.answer } : null)
+        setAnswers(prev => ({
+          ...prev,
+          [currentIndex]: { ...prev[currentIndex], aiInsight: data.answer }
+        }))
       }
-    } finally {
-      setIsQueryingAel(false)
-    }
-  }
-
-  function handleNext() {
-    if (currentIndex < quests.length - 1) {
-      setCurrentIndex(prev => prev + 1)
-      setSelectedIndex(null)
-      setResult(null)
-    } else {
-      router.push(`/session/${pin}`)
+    } catch (e) {
+      // Revert or show error
     }
   }
 
   if (isLoading) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-warm-white">
-        <div className="flex flex-col items-center gap-4">
-          <div className="h-10 w-10 animate-spin rounded-full border-4 border-golden-ink border-t-transparent" />
-          <p className="font-sans text-sm text-ink-brown animate-pulse">Memuat quest...</p>
-        </div>
+      <div className="flex min-h-screen items-center justify-center bg-[#FDFBF7]">
+        <div className="h-10 w-10 animate-spin rounded-full border-4 border-[#C8922A] border-t-transparent" />
       </div>
     )
   }
 
   if (quests.length === 0) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-warm-white">
-        <div className="text-center animate-scale-in">
-          <div className="mb-6 relative h-24 w-24 mx-auto opacity-40 grayscale animate-float">
-            <Image src="/logo.png" alt="Logo" fill className="object-contain" />
+      <div className="flex min-h-screen items-center justify-center bg-[#FDFBF7]">
+        <div className="text-center">
+          <h2 className="font-heading text-2xl font-bold text-[#2C1A08]">Belum ada Quest</h2>
+          <button onClick={() => router.push(`/session/${pin}`)} className="mt-6 font-sans font-semibold text-[#C8922A] hover:text-[#A67520]">
+            ← Kembali
+          </button>
+        </div>
+      </div>
+    )
+  }
+
+  if (isTimeUp) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-[#FDFBF7] p-6">
+        <div className="bg-white rounded-3xl p-10 text-center shadow-sm border border-[#EDE4D3] max-w-md w-full">
+          <div className="w-20 h-20 bg-[#FFE8D6] text-[#D35400] rounded-full flex items-center justify-center mx-auto mb-6">
+            <svg className="w-10 h-10" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
           </div>
-          <h2 className="font-heading text-2xl font-bold text-ink-dark">Belum ada Quest</h2>
-          <button onClick={() => router.push(`/session/${pin}`)} className="mt-6 font-sans font-semibold text-golden-ink hover:text-deep-gold transition-colors">
-            ← Kembali ke Skill Tree
+          <h2 className="font-heading text-2xl font-bold text-[#2C1A08] mb-2">Waktu Habis!</h2>
+          <p className="font-sans text-[#8B6340] mb-8">Waktu pengerjaan quiz telah berakhir.</p>
+          <button onClick={() => router.push(`/session/${pin}`)} className="bg-[#C8922A] text-white px-8 py-3 rounded-xl w-full font-bold">
+            Kembali ke Detail Sesi
           </button>
         </div>
       </div>
@@ -174,219 +225,181 @@ export default function QuestPage({ params }: { params: { pin: string, nodeId: s
   }
 
   const currentQuest = quests[currentIndex]
+  const currentAnswer = answers[currentIndex]
 
   return (
-    <div className="min-h-screen bg-warm-white text-ink-dark">
-      {/* Header */}
-      <header className="sticky top-0 z-30 border-b border-sand-light bg-white/90 backdrop-blur-xl">
-        <div className="mx-auto flex max-w-3xl items-center justify-between px-6 py-4">
-          <button onClick={() => router.push(`/session/${pin}`)} className="rounded-xl p-2 text-ink-brown hover:bg-lontar-pale hover:text-ink-dark transition-all">
-            <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" /></svg>
-          </button>
-          <div className="text-center">
-            <div className="font-heading font-bold text-base leading-tight">{nodeData?.title || 'Loading...'}</div>
-            <div className="font-sans text-[10px] font-semibold text-golden-ink uppercase tracking-widest mt-0.5">Quest Mode</div>
+    <div className="min-h-screen bg-[#FDFBF7] text-[#2C1A08] font-sans pb-10">
+      {/* Top Navigation */}
+      <div className="max-w-4xl mx-auto px-6 py-6">
+        <div className="flex justify-between items-center mb-6">
+          <div className="flex items-center gap-2 font-sans text-[13px] font-semibold text-[#8B6340]">
+            <button onClick={() => router.push(`/session/${pin}`)} className="mr-1 hover:text-[#C8922A] transition-colors">
+              <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M10 19l-7-7m0 0l7-7m-7 7h18" /></svg>
+            </button>
+            <span className="truncate max-w-[150px] sm:max-w-xs">{sessionTitle}</span>
+            <span className="text-[#EDE4D3] mx-1">&gt;</span>
+            <span className="text-[#C8922A]">Quiz No {nodeData?.title ? nodeData.title.replace(/\D/g, '') || (currentIndex + 1) : currentIndex + 1}</span>
           </div>
-          <div className="font-sans text-xs font-bold text-ink-brown bg-lontar-pale px-3 py-1.5 rounded-lg">
-            {currentIndex + 1}/{quests.length}
-          </div>
-        </div>
-        {/* Progress bar */}
-        <div className="h-1 bg-sand-light w-full">
-          <div 
-            className="h-full bg-gradient-to-r from-golden-ink to-bright-gold transition-all duration-500 ease-out" 
-            style={{ width: `${((currentIndex) / quests.length) * 100}%` }} 
-          />
-        </div>
-      </header>
-
-      <main className="mx-auto max-w-3xl px-6 py-10 pb-32">
-        {/* Question Card */}
-        <div className="glass-strong rounded-3xl p-8 mb-8 animate-fade-in-up relative overflow-hidden">
-          <div className="absolute inset-0 lontar-pattern" />
-          <div className="relative z-10">
-            <div className="mb-5 badge-aktif inline-flex uppercase tracking-wider text-[10px]">
-              {currentQuest.bloom_level}
-            </div>
-            <h2 className="font-heading text-2xl leading-relaxed text-ink-dark">{currentQuest.question}</h2>
+          <div className="flex items-center gap-2 font-sans font-bold text-[#2C1A08] bg-white border border-[#EDE4D3] px-3 py-1.5 rounded-full shadow-sm">
+            <svg className="w-4 h-4 text-[#8B6340]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            {formatTime(timeLeft)}
           </div>
         </div>
 
-        {/* Options */}
-        <div className="space-y-3">
-          {currentQuest.options.map((option, idx) => {
-            const isSelected = selectedIndex === idx
-            const isCorrect = result?.correct_index === idx
-            const isWrongSelected = result && !result.is_correct && isSelected
-
-            let btnClass = "group w-full rounded-2xl border-2 p-5 text-left transition-all duration-300 font-sans text-sm "
-            
-            if (!result) {
-              btnClass += isSelected 
-                ? "border-golden-ink bg-gold-tint/15 shadow-gold scale-[1.01]" 
-                : "border-sand-light bg-white hover:bg-lontar-pale hover:border-muted-tan shadow-sm hover:shadow-md"
-            } else {
-              if (isCorrect) {
-                btnClass += "border-mastery-dikuasai bg-mastery-dikuasai/8 shadow-md font-semibold"
-              } else if (isWrongSelected) {
-                btnClass += "border-mastery-lemah bg-mastery-lemah/8"
-              } else {
-                btnClass += "border-sand-light/50 bg-white/50 opacity-40"
-              }
-            }
-
-            return (
-              <button
-                key={idx}
-                onClick={() => !result && setSelectedIndex(idx)}
-                disabled={result !== null}
-                className={btnClass}
-                style={{ animationDelay: `${idx * 0.05}s` }}
-              >
-                <div className="flex items-center gap-4">
-                  <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border-2 font-bold text-sm transition-all
-                    ${!result && isSelected 
-                      ? 'border-golden-ink bg-golden-ink text-white shadow-gold' 
-                      : result && isCorrect 
-                        ? 'border-mastery-dikuasai bg-mastery-dikuasai text-white'
-                        : result && isWrongSelected
-                          ? 'border-mastery-lemah bg-mastery-lemah text-white'
-                          : 'border-sand-light bg-warm-white text-ink-brown group-hover:border-muted-tan'
-                    }`}>
-                    {String.fromCharCode(65 + idx)}
-                  </div>
-                  <span className="leading-relaxed">{option}</span>
-                </div>
-              </button>
-            )
-          })}
+        {/* Progress Bar */}
+        <div className="mb-2 flex justify-between font-sans text-[12px] font-bold text-[#8B6340]">
+          <span>Pertanyaan {currentIndex + 1} dari {quests.length}</span>
+          <span>{Math.round(((currentIndex + 1) / quests.length) * 100)}%</span>
+        </div>
+        <div className="h-1.5 bg-[#F5EFE4] rounded-full overflow-hidden mb-10">
+           <div 
+             className="h-full bg-[#E5D0A1] transition-all duration-500 ease-out" 
+             style={{ width: `${((currentIndex + 1) / quests.length) * 100}%` }} 
+           />
         </div>
 
-        {/* Error */}
-        {error && (
-          <div className="mt-8 rounded-2xl bg-mastery-lemah/10 p-5 text-mastery-lemah border border-mastery-lemah/20 font-sans text-sm font-medium animate-fade-in">
-            {error}
-          </div>
-        )}
+        {/* Main Card */}
+        <div className="bg-white rounded-[2rem] p-8 md:p-12 shadow-[0_8px_30px_rgba(44,26,8,0.04)] border border-[#F0EBE1] relative">
+          
+          <h2 className="font-heading text-[26px] md:text-[32px] font-bold text-[#2C1A08] leading-snug text-center max-w-2xl mx-auto mb-12">
+            {currentQuest.question}
+          </h2>
 
-        {/* Feedback Section - Wrong Answer */}
-        {result && !result.is_correct && (
-          <div className="mt-10 animate-fade-in-up">
-            <div className="rounded-3xl border border-mastery-lemah/20 bg-white shadow-card overflow-hidden">
-              {/* Header bar */}
-              <div className="bg-mastery-lemah/8 px-8 py-5 border-b border-mastery-lemah/10">
-                <h3 className="flex items-center gap-3 font-heading text-lg font-bold text-mastery-lemah">
-                  <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0zM12 9v4M12 17h.01" /></svg>
-                  Jawaban Kurang Tepat
-                </h3>
-              </div>
+          <div className="grid md:grid-cols-2 gap-4 mb-10">
+            {currentQuest.options.map((option, idx) => {
+              const letter = String.fromCharCode(65 + idx)
+              const isSelected = currentAnswer?.selectedIndex === idx
+              const isCorrectOpt = currentAnswer?.result.correct_index === idx
               
-              <div className="p-8">
-                {/* AI Feedback */}
-                {result.feedback && (
-                  <div className="prose prose-stone max-w-none font-sans text-ink-brown leading-relaxed mb-8">
-                    {isQueryingAel ? (
-                      <div className="flex animate-pulse items-center gap-3 font-medium text-golden-ink">
-                        <div className="h-5 w-5 rounded-full border-2 border-golden-ink border-t-transparent animate-spin" />
-                        AI sedang menyusun ulang penjelasan...
-                      </div>
+              let wrapperClass = "flex items-center rounded-2xl border-2 p-4 transition-all duration-300 text-left w-full "
+              let letterClass = "rounded-full w-8 h-8 shrink-0 flex items-center justify-center font-bold text-sm mr-4 transition-colors "
+              
+              if (!currentAnswer) {
+                // Not answered
+                wrapperClass += "border-[#F0EBE1] hover:border-[#D9CDB8] hover:bg-[#FDFBF7] cursor-pointer"
+                letterClass += "bg-[#FDFBF7] text-[#D9CDB8]"
+              } else {
+                // Answered state
+                wrapperClass += "cursor-default "
+                if (isCorrectOpt) {
+                  // This is the correct option
+                  wrapperClass += "border-[#77B28C] bg-[#F4F9F6] "
+                  letterClass += "bg-[#77B28C] text-white"
+                } else if (isSelected && !isCorrectOpt) {
+                  // This is the wrong option selected
+                  wrapperClass += "border-[#D67B7B] bg-[#FCF5F5] "
+                  letterClass += "bg-[#D67B7B] text-white"
+                } else {
+                  // Neutral other options
+                  wrapperClass += "border-[#F0EBE1] opacity-60 "
+                  letterClass += "bg-[#FDFBF7] text-[#D9CDB8]"
+                }
+              }
+
+              return (
+                <button 
+                  key={idx} 
+                  onClick={() => handleOptionClick(idx)}
+                  disabled={!!currentAnswer || isSubmitting || isTimeUp}
+                  className={wrapperClass}
+                >
+                  <div className={letterClass}>
+                    {currentAnswer && isCorrectOpt ? (
+                      <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7"/></svg>
+                    ) : currentAnswer && isSelected && !isCorrectOpt ? (
+                      <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M6 18L18 6M6 6l12 12"/></svg>
                     ) : (
-                      <ReactMarkdown>{result.feedback}</ReactMarkdown>
+                      letter
                     )}
                   </div>
-                )}
+                  <span className={`font-sans text-[15px] font-medium leading-relaxed ${currentAnswer && (isCorrectOpt || isSelected) ? 'text-[#2C1A08]' : 'text-[#5C3D1A]'}`}>
+                    {option}
+                  </span>
+                  {currentAnswer && isCorrectOpt && currentAnswer.result.xp_gained > 0 && isSelected && (
+                    <div className="ml-auto bg-[#FDE68A] text-[#92400E] text-[10px] font-bold px-2 py-1 rounded-full whitespace-nowrap">
+                      +{currentAnswer.result.xp_gained} XP
+                    </div>
+                  )}
+                </button>
+              )
+            })}
+          </div>
 
-                {/* Mode Selection */}
-                <div className="rounded-2xl bg-lontar-pale/50 p-5 border border-sand-light">
-                  <p className="mb-3 font-sans text-xs font-bold text-ink-dark uppercase tracking-wide">Gaya Penjelasan AI Tutor</p>
-                  <div className="flex flex-wrap gap-2">
-                    {['standard', 'eli5', 'teknikal', 'drill'].map(mode => (
-                      <button
-                        key={mode}
-                        onClick={() => handleAelQuery(mode)}
-                        className={`rounded-xl px-4 py-2 font-sans text-xs font-bold capitalize transition-all duration-200
-                          ${aelMode === mode 
-                            ? 'bg-golden-ink text-white shadow-gold' 
-                            : 'bg-white text-ink-brown hover:bg-warm-white hover:text-ink-dark border border-sand-light hover:border-muted-tan'}`}
-                      >
-                        {mode}
-                      </button>
-                    ))}
-                  </div>
+          {error && (
+             <div className="mb-6 text-center text-[#D67B7B] font-sans text-sm">{error}</div>
+          )}
+
+          {/* AI Insight */}
+          {currentAnswer && (
+            <div className="bg-[#FBE9B6] rounded-2xl p-6 mb-10 animate-fade-in">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-4">
+                <div className="flex items-center gap-2 font-sans font-bold text-[#8B6340]">
+                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
+                  </svg>
+                  AI Insight
                 </div>
-
-                {/* Strike Warning */}
-                {strikeCount >= 3 && (
-                  <div className="mt-6 rounded-2xl bg-mastery-aktif/10 p-5 border border-mastery-aktif/20 flex items-start gap-4 animate-fade-in">
-                     <span className="text-2xl">💡</span>
-                     <p className="font-sans text-sm font-medium text-ink-brown">Sepertinya kamu kesulitan di konsep ini. Dosen telah diberitahu untuk membantumu. Mau lewati soal ini dulu?</p>
+                <div className="flex gap-2">
+                  {['eli5', 'standard', 'teknikal'].map(mode => (
+                    <button 
+                      key={mode}
+                      onClick={() => handleAelQuery(mode)}
+                      className={`rounded-full px-4 py-1 text-[11px] font-bold capitalize transition-colors
+                        ${currentAnswer.aelMode === mode 
+                          ? 'bg-[#8B6340] text-white border border-[#8B6340]' 
+                          : 'bg-transparent text-[#8B6340] border border-[#D9B76A] hover:bg-[#F5D783]'}`}
+                    >
+                      {mode === 'eli5' ? 'ELI5' : mode}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div className="font-sans text-[14px] text-[#5C3D1A] leading-relaxed">
+                {currentAnswer.aiInsight ? (
+                  <ReactMarkdown>{currentAnswer.aiInsight}</ReactMarkdown>
+                ) : (
+                  <div className="flex items-center gap-2 animate-pulse text-[#C8922A]">
+                    <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin"></div>
+                    Menyusun insight...
                   </div>
                 )}
               </div>
             </div>
-          </div>
-        )}
-
-        {/* Success Section */}
-        {result && result.is_correct && (
-          <div className="mt-10 animate-fade-in-up rounded-3xl border border-mastery-dikuasai/30 bg-white shadow-card p-10 text-center relative overflow-hidden">
-            {/* Top accent */}
-            <div className="absolute top-0 left-0 w-full h-1.5 bg-gradient-to-r from-mastery-dikuasai via-mastery-dikuasai/80 to-mastery-dikuasai" />
-            
-            <div className="mx-auto mb-6 flex h-20 w-20 items-center justify-center rounded-2xl bg-mastery-dikuasai/10 text-mastery-dikuasai">
-              <svg className="h-10 w-10" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" /></svg>
-            </div>
-            <h3 className="font-heading text-3xl font-bold text-ink-dark mb-3">Tepat Sekali!</h3>
-            <div className="flex items-center justify-center gap-3 font-sans">
-              <span className="badge-dikuasai !text-sm">+{result.xp_gained} XP</span>
-              <span className="badge-aktif !text-sm">Mastery: {(result.new_mastery_score * 100).toFixed(0)}%</span>
-            </div>
-          </div>
-        )}
-
-      </main>
-
-      {/* Bottom Action Bar */}
-      <div className="fixed bottom-0 left-0 w-full border-t border-sand-light bg-white/95 backdrop-blur-xl p-5 shadow-[0_-8px_30px_rgba(44,26,8,0.05)]">
-        <div className="mx-auto flex max-w-3xl justify-between items-center">
-          <div className="font-sans text-sm font-bold text-ink-brown">
-            {strikeCount > 0 ? (
-              <span className="text-mastery-lemah">{strikeCount} Kesalahan beruntun</span>
-            ) : (
-              <span className="text-golden-ink">✨ Fokus!</span>
-            )}
-          </div>
-          
-          {!result ? (
-            <button
-              onClick={handleSubmit}
-              disabled={selectedIndex === null || isSubmitting}
-              className="btn-gold !rounded-2xl !px-10 !py-3.5"
-            >
-              {isSubmitting ? (
-                <span className="flex items-center gap-2">
-                  <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
-                  Mengirim...
-                </span>
-              ) : 'Submit Jawaban'}
-            </button>
-          ) : result.is_correct || strikeCount >= 3 ? (
-            <button
-              onClick={handleNext}
-              className="rounded-2xl bg-mastery-dikuasai px-10 py-3.5 font-sans font-bold text-white transition-all hover:bg-green-700 shadow-lg"
-            >
-              {currentIndex < quests.length - 1 ? 'Soal Berikutnya →' : 'Kembali ke Skill Tree'}
-            </button>
-          ) : (
-            <button
-              onClick={() => {
-                setResult(null); setSelectedIndex(null);
-              }}
-              className="rounded-2xl border-2 border-golden-ink bg-white px-10 py-3.5 font-sans font-bold text-golden-ink transition-all hover:bg-gold-tint/10 hover:shadow-gold"
-            >
-              Coba Lagi
-            </button>
           )}
+
+          {/* Footer Actions */}
+          <div className="flex justify-between items-center pt-6 mt-6 border-t border-[#F0EBE1]">
+            <button className="flex items-center gap-2 text-[#8B6340] hover:text-[#2C1A08] font-sans text-xs font-semibold transition-colors">
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 21v-4m0 0V5a2 2 0 012-2h6.5l1 1H21l-3 6 3 6h-8.5l-1-1H5a2 2 0 00-2 2zm9-13.5V9" />
+              </svg>
+              Report Issue
+            </button>
+            <div className="flex gap-3">
+              <button 
+                onClick={() => setCurrentIndex(prev => Math.max(0, prev - 1))}
+                disabled={currentIndex === 0}
+                className={`border border-[#D9CDB8] text-[#8B6340] px-6 py-2.5 rounded-xl font-sans font-bold text-sm transition-colors ${currentIndex === 0 ? 'opacity-50 cursor-not-allowed' : 'hover:bg-[#FDFBF7]'}`}
+              >
+                &larr; Sebelumnya
+              </button>
+              <button 
+                onClick={() => {
+                  if (currentIndex < quests.length - 1) {
+                    setCurrentIndex(prev => prev + 1)
+                  } else {
+                    router.push(`/session/${pin}`)
+                  }
+                }}
+                className="bg-[#C8922A] hover:bg-[#A67520] text-white px-6 py-2.5 rounded-xl font-sans font-bold text-sm transition-colors flex items-center gap-2"
+              >
+                {currentIndex < quests.length - 1 ? 'Selanjutnya \u2192' : 'Selesai \u2192'}
+              </button>
+            </div>
+          </div>
+
         </div>
       </div>
     </div>

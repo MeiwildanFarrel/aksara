@@ -18,7 +18,7 @@ export async function GET(request: NextRequest) {
     // 2. Cek apakah user sudah ada di tabel public.users
     const { data: existingUser, error: queryError } = await supabase
       .from('users')
-      .select('id, email, role, created_at')
+      .select('id, email, role, created_at, full_name, avatar_url')
       .eq('id', user.id)
       .maybeSingle()
 
@@ -31,12 +31,25 @@ export async function GET(request: NextRequest) {
 
     // 3. Jika sudah ada, langsung kembalikan data
     if (existingUser) {
-      return NextResponse.json(existingUser)
+      return NextResponse.json({
+        ...existingUser,
+        // prefer DB values (updated via /api/user/profile), fallback to auth metadata
+        full_name: existingUser.full_name || user.user_metadata?.full_name || null,
+        avatar_url: existingUser.avatar_url || user.user_metadata?.avatar_url || null,
+      })
     }
 
-    // 4. Belum ada di tabel → INSERT baru
+    // 4. Belum ada di tabel
     const { searchParams } = new URL(request.url)
     const rawRole = searchParams.get('role')
+
+    // Jika tidak ada parameter role (hanya mengecek apakah user sudah ada),
+    // kita kembalikan status 200 dengan info bahwa role belum di-set.
+    if (!rawRole) {
+      return NextResponse.json({ exists: false, role: null }, { status: 200 })
+    }
+
+    // Jika ada parameter role, berarti dipanggil saat proses submit onboarding
     const role: 'instructor' | 'student' =
       rawRole === 'instructor' ? 'instructor' : 'student'
 

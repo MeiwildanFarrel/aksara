@@ -16,9 +16,9 @@ export async function GET() {
     }
 
     // 2. Query semua sesi milik instructor ini
-    const { data: sessions, error: queryError } = await supabase
+    const { data: sessions, error: queryError } = await (supabase as any)
       .from('sessions')
-      .select('id, title, pin, instructor_id, created_at')
+      .select('id, title, pin, instructor_id, created_at, status')
       .eq('instructor_id', user.id)
       .order('created_at', { ascending: false })
 
