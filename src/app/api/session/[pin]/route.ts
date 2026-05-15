@@ -2,9 +2,97 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient as createSupabaseClient } from '@supabase/supabase-js'
 import { createClient } from '../../../../../lib/supabase/server'
 import type { Database } from '../../../../../types/supabase'
+import { generateText } from '../../../../../lib/gemini'
 
 function isUuid(value: string) {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value)
+}
+
+function cleanText(value: string) {
+  return value.replace(/\s+/g, ' ').trim()
+}
+
+function fallbackSynopsis(title: string, chunks: Array<{ content: string | null }>) {
+  const content = cleanText(chunks.map((chunk) => chunk.content ?? '').join(' '))
+  if (!content) {
+    return `Course ini membantu mahasiswa memahami konsep utama ${title} melalui rangkaian quest interaktif, latihan bertahap, dan evaluasi mastery.`
+  }
+
+  return cleanText(
+    content
+      .replace(/catatan kuliah/gi, '')
+      .replace(/\[[^\]]+\]/g, '')
+      .replace(/\b(revisi|program studi|halaman)\b[^.]{0,80}/gi, ''),
+  ).slice(0, 420)
+}
+
+async function buildCourseSynopsis(title: string, chunks: Array<{ content: string | null; source_ref: string | null }>) {
+  if (chunks.length === 0) return null
+
+  const context = chunks
+    .map((chunk, index) => `[Chunk ${index + 1}] ${cleanText(chunk.content ?? '').slice(0, 1400)}`)
+    .join('\n\n')
+
+  try {
+    const response = await generateText([
+      'Anda adalah AKSARA, AI learning copilot.',
+      'Buat sinopsis course untuk mahasiswa berdasarkan konteks RAG berikut.',
+      'Jangan menyalin header dokumen, nomor halaman, atau metadata mentah.',
+      'Tulis dalam Bahasa Indonesia, 2 kalimat, maksimal 70 kata.',
+      'Fokus pada: course ini mempelajari apa, skill apa yang dilatih, dan manfaat quest.',
+      '',
+      `Judul course: ${title}`,
+      '',
+      '=== KONTEKS RAG ===',
+      context,
+      '=== AKHIR KONTEKS ===',
+    ].join('\n'))
+
+    const summary = cleanText(response)
+    return summary || fallbackSynopsis(title, chunks)
+  } catch (err) {
+    console.error('[session/detail] synopsis generation failed:', err instanceof Error ? err.message : err)
+    return fallbackSynopsis(title, chunks)
+  }
+}
+
+function getAdminClient() {
+  return createSupabaseClient<Database>(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!,
+  )
+}
+
+async function getInstructorProfile(instructorId: string | null) {
+  if (!instructorId) return null
+
+  const admin = getAdminClient()
+  let { data: profile, error } = await (admin as any)
+    .from('users')
+    .select('id, email, full_name, avatar_url')
+    .eq('id', instructorId)
+    .maybeSingle()
+
+  if (error) {
+    const fallback = await (admin as any)
+      .from('users')
+      .select('id, email')
+      .eq('id', instructorId)
+      .maybeSingle()
+
+    profile = fallback.data
+  }
+
+  const { data: authUser } = await admin.auth.admin.getUserById(instructorId)
+  const metadata = authUser.user?.user_metadata ?? {}
+
+  return {
+    id: instructorId,
+    email: profile?.email ?? authUser.user?.email ?? null,
+    full_name: profile?.full_name ?? metadata.full_name ?? metadata.name ?? null,
+    avatar_url: profile?.avatar_url ?? null,
+    university: metadata.university ?? null,
+  }
 }
 
 export async function GET(
@@ -24,9 +112,9 @@ export async function GET(
 
     const supabase = await createClient()
 
-    const { data: session, error } = await supabase
+    const { data: session, error } = await (supabase as any)
       .from('sessions')
-      .select('id, title, instructor_id, created_at, users!sessions_instructor_id_fkey(email)')
+      .select('id, title, instructor_id, created_at')
       .eq('pin', pin)
       .maybeSingle()
 
@@ -44,19 +132,25 @@ export async function GET(
       )
     }
 
-    // Fetch first pdf_chunk as description/summary
-    const { data: firstChunk } = await supabase
+    const { data: chunks } = await supabase
       .from('pdf_chunks')
-      .select('content')
+      .select('content, source_ref')
       .eq('session_id', session.id)
       .order('created_at', { ascending: true })
-      .limit(1)
-      .maybeSingle()
+      .limit(4)
+
+    const description = await buildCourseSynopsis(
+      session.title,
+      (chunks ?? []) as Array<{ content: string | null; source_ref: string | null }>,
+    )
+    const instructor = await getInstructorProfile(session.instructor_id ?? null)
 
     return NextResponse.json({
       ...session,
+      instructor,
+      users: instructor,
       pin,
-      description: firstChunk?.content?.slice(0, 300) || null
+      description
     })
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Internal server error'

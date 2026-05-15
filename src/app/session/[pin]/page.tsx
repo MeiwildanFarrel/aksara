@@ -2,18 +2,23 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import Image from 'next/image'
 import { createClient } from '../../../../lib/supabase/client'
-import notificationIcon from '../../public/notification.png'
-import settingsIcon from '../../public/settings.png'
-import wmIcon from '../../public/wm_icon.png'
+import StudentNav from '../../dashboard/student/components/StudentNav'
 
 interface Session {
   id: string
   title: string
   pin: string
   description?: string | null
-  users?: { email: string }
+  users?: InstructorProfile | InstructorProfile[] | null
+}
+
+interface InstructorProfile {
+  id?: string | null
+  email?: string | null
+  full_name?: string | null
+  avatar_url?: string | null
+  university?: string | null
 }
 
 interface SkillNode {
@@ -89,12 +94,6 @@ export default function SessionDetail({ params }: { params: { pin: string } }) {
     loadData()
   }, [pin])
 
-  const handleSignOut = async () => {
-    const supabase = createClient()
-    await supabase.auth.signOut()
-    router.replace('/login')
-  }
-
   const isNodeUnlocked = (node: SkillNode, index: number) => {
     const prerequisites = node.prerequisite_ids ?? []
     if (prerequisites.length > 0) {
@@ -105,6 +104,17 @@ export default function SessionDetail({ params }: { params: { pin: string } }) {
     const previousNode = nodes[index - 1]
     return previousNode ? mastery[previousNode.id] !== undefined : true
   }
+
+  const instructor = Array.isArray(session?.users) ? session?.users[0] : session?.users
+  const instructorName = instructor?.full_name || instructor?.email?.split('@')[0] || 'Dosen Aksara'
+  const instructorUniversity = instructor?.university || 'Dosen & Pengajar'
+  const instructorInitials = instructorName
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part) => part[0])
+    .join('')
+    .toUpperCase() || 'D'
 
   if (isLoading) {
     return (
@@ -130,45 +140,7 @@ export default function SessionDetail({ params }: { params: { pin: string } }) {
 
   return (
     <div className="min-h-screen bg-[#FBF7F0] text-[#2C1A08] font-sans pb-20">
-      
-      {/* Navbar */}
-      <header className="w-full bg-[#2C1A08] px-8 py-3 flex items-center justify-between relative overflow-hidden">
-        {/* Left: Logo */}
-        <div className="flex items-center z-10">
-          <div className="relative w-24 h-24 -my-8 cursor-pointer" onClick={() => router.push('/dashboard/student')}>
-            <Image src={wmIcon} alt="Aksara Logo" fill className="object-contain scale-150" priority />
-          </div>
-        </div>
-
-        {/* Center: Navigation */}
-        <div className="absolute left-1/2 transform -translate-x-1/2 flex items-center gap-8 z-10">
-          <a href="/dashboard/student" className="text-[#C4A882] font-sans text-sm hover:text-white transition-colors pb-1">
-            Dashboard
-          </a>
-          <a href="/dashboard/student/sessions" className="text-[#C8922A] font-sans font-semibold text-sm border-b-2 border-[#C8922A] pb-1">
-            Sessions
-          </a>
-          <a href="#" className="text-[#C4A882] font-sans text-sm hover:text-white transition-colors pb-1">
-            Skill Tree
-          </a>
-          <a href="#" className="text-[#C4A882] font-sans text-sm hover:text-white transition-colors pb-1">
-            Insights
-          </a>
-        </div>
-
-        {/* Right: Actions */}
-        <div className="flex items-center gap-6 z-10">
-          <button className="relative w-10 h-10 opacity-80 hover:opacity-100 transition-opacity">
-            <Image src={notificationIcon} alt="Notifications" fill className="object-contain" />
-          </button>
-          <button className="relative w-10 h-10 opacity-80 hover:opacity-100 transition-opacity">
-            <Image src={settingsIcon} alt="Settings" fill className="object-contain" />
-          </button>
-          <button onClick={handleSignOut} className="relative w-8 h-8 rounded-full overflow-hidden border border-[#5C3D1A] bg-[#8B6340] flex items-center justify-center text-white font-sans text-xs hover:border-[#C8922A] transition-colors" title="Sign Out">
-             {user?.email?.charAt(0).toUpperCase() || 'S'}
-          </button>
-        </div>
-      </header>
+      <StudentNav active="sessions" user={user} />
 
       {/* Main Content */}
       <main className="mx-auto max-w-5xl px-6 py-12 flex flex-col items-center">
@@ -202,19 +174,23 @@ export default function SessionDetail({ params }: { params: { pin: string } }) {
         {/* Author */}
         <div className="flex flex-col items-center mb-10">
           <div className="w-16 h-16 rounded-full border border-[#C8922A] mb-4 flex items-center justify-center bg-[#FDFBF7] shadow-sm overflow-hidden text-[#C8922A] font-heading font-bold text-2xl">
-             {session.users?.email ? session.users.email.charAt(0).toUpperCase() : 'D'}
+            {instructor?.avatar_url ? (
+              <img src={instructor.avatar_url} alt={instructorName} className="h-full w-full object-cover" />
+            ) : (
+              instructorInitials
+            )}
           </div>
           <span className="text-[10px] font-bold font-sans text-[#C8922A] uppercase tracking-widest mb-1">Penyusun Quest</span>
           <h3 className="font-heading text-[22px] font-bold text-[#2C1A08] mb-0.5">
-            {session.users?.email ? session.users.email.split('@')[0] : 'Dosen Aksara'}
+            {instructorName}
           </h3>
-          <p className="text-[13px] font-sans text-[#8B6340]">{session.users?.email || 'Dosen & Pengajar'}</p>
+          <p className="text-[13px] font-sans text-[#8B6340]">{instructorUniversity}</p>
         </div>
 
         {/* Description */}
         <p className="text-center max-w-2xl text-[15px] font-sans text-[#5C3D1A] leading-[1.8] mb-20">
           {session.description 
-            ? session.description + (session.description.length >= 300 ? '...' : '')
+            ? session.description
             : `Uji pemahaman Anda melalui rangkaian quest interaktif tentang ${session.title}. Evaluasi penguasaan materi dalam format tantangan yang mendalam.`
           }
         </p>

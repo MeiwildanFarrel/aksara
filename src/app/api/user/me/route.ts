@@ -7,6 +7,11 @@ const noStoreHeaders = {
   'Cache-Control': 'no-store, no-cache, must-revalidate, max-age=0',
 }
 
+const extendedUserSelect =
+  'id, email, role, created_at, full_name, avatar_url, phone, nim, university, faculty, study_program, tier'
+const profileUserSelect = 'id, email, role, created_at, full_name, avatar_url, phone, university'
+const baseUserSelect = 'id, email, role, created_at'
+
 export async function GET(request: NextRequest) {
   try {
     const supabase = await createClient()
@@ -21,18 +26,38 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401, headers: noStoreHeaders })
     }
 
-    // 2. Cek apakah user sudah ada di tabel public.users
-    const { data: existingUser, error: queryError } = await supabase
+    // 2. Cek apakah user sudah ada di tabel public.users.
+    // Keep this backward-compatible: local/remote DBs can lag behind profile migrations.
+    let { data: existingUser, error: queryError } = await (supabase as any)
       .from('users')
-      .select('id, email, role, created_at, full_name, avatar_url')
+      .select(extendedUserSelect)
       .eq('id', user.id)
       .maybeSingle()
 
     if (queryError) {
-      return NextResponse.json(
-        { error: 'Gagal mengambil data user.', detail: queryError.message },
-        { status: 500, headers: noStoreHeaders },
-      )
+      let fallback = await (supabase as any)
+        .from('users')
+        .select(profileUserSelect)
+        .eq('id', user.id)
+        .maybeSingle()
+
+      if (fallback.error) {
+        fallback = await (supabase as any)
+          .from('users')
+          .select(baseUserSelect)
+          .eq('id', user.id)
+          .maybeSingle()
+      }
+
+      existingUser = fallback.data
+      queryError = fallback.error
+
+      if (queryError) {
+        return NextResponse.json(
+          { error: 'Gagal mengambil data user.', detail: queryError.message },
+          { status: 500, headers: noStoreHeaders },
+        )
+      }
     }
 
     // 3. Jika sudah ada, langsung kembalikan data
@@ -42,7 +67,12 @@ export async function GET(request: NextRequest) {
         // Keep avatars out of Auth metadata; large data URLs there inflate SSR cookies.
         full_name: user.user_metadata?.full_name ?? existingUser.full_name ?? null,
         avatar_url: existingUser.avatar_url ?? null,
-        university: user.user_metadata?.university ?? null,
+        phone: existingUser.phone ?? user.user_metadata?.phone ?? null,
+        nim: existingUser.nim ?? user.user_metadata?.nim ?? null,
+        university: existingUser.university ?? user.user_metadata?.university ?? null,
+        faculty: existingUser.faculty ?? user.user_metadata?.faculty ?? null,
+        study_program: existingUser.study_program ?? user.user_metadata?.study_program ?? null,
+        tier: existingUser.tier ?? user.user_metadata?.tier ?? 'Bronze Scholar',
       }, { headers: noStoreHeaders })
     }
 

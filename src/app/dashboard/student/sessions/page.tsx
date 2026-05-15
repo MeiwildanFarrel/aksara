@@ -2,15 +2,12 @@
 
 import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
-import Image from 'next/image'
 import { createClient } from '../../../../../lib/supabase/client'
-import notificationIcon from '../../../public/notification.png'
-import settingsIcon from '../../../public/settings.png'
-import wmIcon from '../../../public/wm_icon.png'
+import StudentNav from '../components/StudentNav'
 
 export default function StudentSessions() {
   const router = useRouter()
-  const [user, setUser] = useState<{ email: string } | null>(null)
+  const [user, setUser] = useState<any | null>(null)
   const [activeFilter, setActiveFilter] = useState('Semua')
   const [joinedSessions, setJoinedSessions] = useState<any[]>([])
   const [sessionStats, setSessionStats] = useState<Record<string, { nodes: number, completed: number }>>({})
@@ -35,7 +32,7 @@ export default function StudentSessions() {
         const supabase = createClient()
         const sessionIds = sessions.map((s: any) => s.id)
         if (sessionIds.length > 0) {
-           const { data: activeSessions } = await supabase
+           const { data: activeSessions } = await (supabase as any)
              .from('sessions')
              .select('id, status')
              .in('id', sessionIds)
@@ -103,12 +100,6 @@ export default function StudentSessions() {
       loadStats()
     }
   }, [joinedSessions])
-
-  const handleSignOut = async () => {
-    const supabase = createClient()
-    await supabase.auth.signOut()
-    router.replace('/login')
-  }
 
   // --- PIN Input Handlers ---
   const handlePinChange = (index: number, value: string) => {
@@ -186,41 +177,7 @@ export default function StudentSessions() {
   return (
     <div className="min-h-screen bg-[#FBF7F0] flex flex-col items-center">
       
-      {/* Navbar */}
-      <header className="w-full bg-[#2C1A08] px-8 py-3 flex items-center justify-between relative overflow-hidden">
-        <div className="flex items-center z-10">
-          <div className="relative w-24 h-24 -my-8 cursor-pointer" onClick={() => router.push('/dashboard/student')}>
-            <Image src={wmIcon} alt="Aksara Logo" fill className="object-contain scale-150" priority />
-          </div>
-        </div>
-
-        <div className="absolute left-1/2 transform -translate-x-1/2 flex items-center gap-8 z-10">
-          <a href="/dashboard/student" className="text-[#C4A882] font-sans text-sm hover:text-white transition-colors pb-1">
-            Dashboard
-          </a>
-          <a href="/dashboard/student/sessions" className="text-[#C8922A] font-sans font-semibold text-sm border-b-2 border-[#C8922A] pb-1">
-            Sessions
-          </a>
-          <a href="#" className="text-[#C4A882] font-sans text-sm hover:text-white transition-colors pb-1">
-            Skill Tree
-          </a>
-          <a href="#" className="text-[#C4A882] font-sans text-sm hover:text-white transition-colors pb-1">
-            Insights
-          </a>
-        </div>
-
-        <div className="flex items-center gap-6 z-10">
-          <button className="relative w-10 h-10 opacity-80 hover:opacity-100 transition-opacity">
-            <Image src={notificationIcon} alt="Notifications" fill className="object-contain" />
-          </button>
-          <button className="relative w-10 h-10 opacity-80 hover:opacity-100 transition-opacity">
-            <Image src={settingsIcon} alt="Settings" fill className="object-contain" />
-          </button>
-          <button onClick={handleSignOut} className="relative w-8 h-8 rounded-full overflow-hidden border border-[#5C3D1A] bg-[#8B6340] flex items-center justify-center text-white font-sans text-xs hover:border-[#C8922A] transition-colors" title="Sign Out">
-             {user?.email?.charAt(0).toUpperCase() || 'S'}
-          </button>
-        </div>
-      </header>
+      <StudentNav active="sessions" user={user} />
 
       {/* Main Content */}
       <main className="flex-1 w-full max-w-[1200px] px-8 py-12">

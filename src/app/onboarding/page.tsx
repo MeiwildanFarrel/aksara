@@ -41,7 +41,9 @@ export default function OnboardingPage() {
     try {
       const res = await fetch(`/api/user/me?role=${selectedRole}`)
       if (res.status === 201 || res.status === 200) {
-        router.replace(`/dashboard/${selectedRole}`)
+        const data = await res.json().catch(() => null)
+        const role = data?.role === 'instructor' || data?.role === 'student' ? data.role : selectedRole
+        router.replace(`/dashboard/${role}`)
       } else {
         const data = await res.json()
         throw new Error(data.error || 'Gagal menyimpan role')
