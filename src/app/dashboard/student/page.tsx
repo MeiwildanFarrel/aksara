@@ -19,6 +19,8 @@ export default function StudentDashboard() {
   const [questTerakhir, setQuestTerakhir] = useState<{ topicTitle: string; results: boolean[]; nodeId: string } | null>(null)
   const [resumeNode, setResumeNode] = useState<{ nodeId: string; nodeTitle: string; sessionPin: string; score: number } | null>(null)
   const [pinInput, setPinInput] = useState('')
+  const [pinError, setPinError] = useState<string | null>(null)
+  const [isJoining, setIsJoining] = useState(false)
 
   useEffect(() => {
     async function checkUser() {
@@ -197,6 +199,26 @@ export default function StudentDashboard() {
 
   const { mmr, tier, next, progressToNext, winRate, difficultyClimb, totalQuiz, division } = mmrData as any
 
+  async function handleJoinSession(e: React.FormEvent) {
+    e.preventDefault()
+    const pin = pinInput.trim()
+    if (pin.length !== 6) return
+    setIsJoining(true)
+    setPinError(null)
+    try {
+      const res = await fetch(`/api/session/${pin}`)
+      if (res.ok) {
+        router.push(`/session/${pin}`)
+      } else {
+        setPinError('PIN tidak ditemukan')
+      }
+    } catch {
+      setPinError('PIN tidak ditemukan')
+    } finally {
+      setIsJoining(false)
+    }
+  }
+
   return (
     <div className="min-h-screen bg-[#FFF9F2] flex flex-col">
 
@@ -228,25 +250,30 @@ export default function StudentDashboard() {
               </p>
             </div>
             <form
-              onSubmit={(e) => { e.preventDefault(); if (pinInput.trim().length === 6) router.push(`/dashboard/student/sessions?pin=${pinInput.trim()}`) }}
-              className="flex flex-col sm:flex-row gap-3 w-full md:w-auto"
+              onSubmit={handleJoinSession}
+              className="flex flex-col gap-2 w-full md:w-auto"
             >
-              <input
-                type="text"
-                inputMode="numeric"
-                maxLength={6}
-                value={pinInput}
-                onChange={(e) => setPinInput(e.target.value.replace(/\D/g, '').slice(0, 6))}
-                placeholder="000000"
-                className="w-full sm:w-40 bg-white/10 border border-white/20 text-white placeholder-white/40 rounded-xl px-4 py-3 font-mono text-[20px] tracking-widest text-center font-bold outline-none focus:border-[#C8922A] focus:ring-1 focus:ring-[#C8922A] transition-colors"
-              />
-              <button
-                type="submit"
-                disabled={pinInput.length !== 6}
-                className="bg-[#C8922A] hover:bg-[#A67520] disabled:opacity-40 disabled:cursor-not-allowed text-white py-3 px-6 rounded-xl font-sans font-bold transition-colors whitespace-nowrap"
-              >
-                Masuk ke Kelas
-              </button>
+              <div className="flex flex-col sm:flex-row gap-3">
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  maxLength={6}
+                  value={pinInput}
+                  onChange={(e) => { setPinInput(e.target.value.replace(/\D/g, '').slice(0, 6)); setPinError(null) }}
+                  placeholder="000000"
+                  className="w-full sm:w-40 bg-white/10 border border-white/20 text-white placeholder-white/40 rounded-xl px-4 py-3 font-mono text-[20px] tracking-widest text-center font-bold outline-none focus:border-[#C8922A] focus:ring-1 focus:ring-[#C8922A] transition-colors"
+                />
+                <button
+                  type="submit"
+                  disabled={pinInput.length !== 6 || isJoining}
+                  className="bg-[#C8922A] hover:bg-[#A67520] disabled:opacity-40 disabled:cursor-not-allowed text-white py-3 px-6 rounded-xl font-sans font-bold transition-colors whitespace-nowrap"
+                >
+                  {isJoining ? 'Mencari...' : 'Masuk ke Kelas'}
+                </button>
+              </div>
+              {pinError && (
+                <p className="text-red-400 text-xs font-semibold text-center">{pinError}</p>
+              )}
             </form>
           </div>
         )}
