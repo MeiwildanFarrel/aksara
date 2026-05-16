@@ -21,7 +21,7 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="relative min-h-screen bg-warm-white flex flex-col items-center justify-center overflow-hidden">
+    <div className="relative min-h-screen bg-warm-white flex flex-col items-center justify-center overflow-hidden py-10">
       {/* Decorative Background Orbs */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
         <div className="absolute top-[10%] left-[10%] w-[500px] h-[500px] rounded-full bg-[#FAE8B0]/40 blur-[120px]" />
@@ -31,17 +31,16 @@ export default function LoginPage() {
       <div className="relative z-10 w-full max-w-[440px] px-6 flex flex-col items-center">
 
         {/* Header Outside Card */}
-        <div className="mb-6 flex flex-col items-center text-center">
-          <div className="relative w-60 h-60 -mt-10 -mb-12">
+        <div className="mb-8 flex flex-col items-center text-center">
+          <div className="relative h-[132px] w-[220px] sm:h-[150px] sm:w-[250px]">
             <Image
               src={wmIcon}
               alt="Logo Aksara"
               fill
-              className="object-contain drop-shadow-sm scale-110"
+              className="object-contain drop-shadow-sm"
               priority
             />
           </div>
-       
         </div>
 
         {/* The White Card */}

@@ -66,7 +66,7 @@ export default function OnboardingPage() {
   }
 
   return (
-    <div className="relative min-h-screen bg-warm-white flex flex-col items-center justify-center p-6 overflow-hidden">
+    <div className="relative min-h-screen bg-warm-white flex flex-col items-center justify-center px-6 py-10 overflow-hidden">
       {/* Decorative background */}
       <div className="absolute inset-0 pointer-events-none overflow-hidden">
         <div className="absolute -top-[10%] left-[20%] w-[400px] h-[400px] rounded-full bg-[#FAE8B0]/50 blur-[100px]" />
@@ -76,13 +76,13 @@ export default function OnboardingPage() {
       <div className="relative z-10 w-full max-w-3xl flex flex-col items-center">
         
         {/* Header Outside Card */}
-        <div className="mb-6 flex flex-col items-center text-center">
-          <div className="relative w-60 h-60 -mt-10 -mb-12">
+        <div className="mb-8 flex flex-col items-center text-center">
+          <div className="relative h-[132px] w-[220px] sm:h-[150px] sm:w-[250px]">
             <Image
               src={wmIcon}
               alt="Aksara Logo"
               fill
-              className="object-contain drop-shadow-sm scale-110"
+              className="object-contain drop-shadow-sm"
               priority
             />
           </div>
