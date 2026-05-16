@@ -259,7 +259,7 @@ export default function StudentNav({ active = 'dashboard', user: providedUser }:
   }
 
   return (
-    <header className="w-full bg-[#2C1A08] px-4 md:px-8 py-4 flex items-center justify-end relative overflow-visible z-30">
+    <header className="sticky top-0 w-full bg-[#2C1A08] px-4 md:px-8 py-4 flex items-center justify-end overflow-visible z-50 shadow-md">
       <nav className="hidden md:flex absolute left-1/2 transform -translate-x-1/2 items-center gap-8 z-10">
         <a href="/dashboard/student" className={`${active === 'dashboard' ? 'text-[#C8922A] font-semibold border-b-2 border-[#C8922A]' : 'text-[#C4A882] hover:text-white'} font-sans text-sm transition-colors pb-1`}>Dashboard</a>
         <a href="/dashboard/student/sessions" className={`${active === 'sessions' ? 'text-[#C8922A] font-semibold border-b-2 border-[#C8922A]' : 'text-[#C4A882] hover:text-white'} font-sans text-sm transition-colors pb-1`}>Sessions</a>
@@ -267,15 +267,15 @@ export default function StudentNav({ active = 'dashboard', user: providedUser }:
         <a href="/dashboard/student/insights" className={`${active === 'insights' ? 'text-[#C8922A] font-semibold border-b-2 border-[#C8922A]' : 'text-[#C4A882] hover:text-white'} font-sans text-sm transition-colors pb-1`}>Insights</a>
       </nav>
 
-      <div className="flex items-center gap-3 md:gap-6 z-10">
-        <div className="relative" ref={notifRef}>
+      <div className="flex items-center gap-5 md:gap-7 z-10">
+        <div className="relative flex items-center" ref={notifRef}>
           <button
             onClick={() => setIsNotificationOpen((value) => !value)}
-            className="relative w-10 h-10 opacity-90 hover:opacity-100 transition-opacity"
+            className="relative w-[26px] h-[26px] opacity-90 hover:opacity-100 transition-opacity flex items-center justify-center"
             aria-label="Notifications"
           >
-            <Image src={notificationIcon} alt="Notifications" fill sizes="40px" className="object-contain" />
-            {hasUnread && <span className="absolute right-1 top-1 h-2.5 w-2.5 rounded-full bg-[#E74C3C] ring-2 ring-[#2C1A08]" />}
+            <Image src={notificationIcon} alt="Notifications" fill sizes="26px" className="object-contain" />
+            {hasUnread && <span className="absolute -right-1 -top-1 h-2.5 w-2.5 rounded-full bg-[#E74C3C] ring-2 ring-[#2C1A08]" />}
           </button>
 
           {isNotificationOpen && (
@@ -314,14 +314,14 @@ export default function StudentNav({ active = 'dashboard', user: providedUser }:
           )}
         </div>
 
-        <button onClick={() => router.push('/dashboard/student/settings')} className="relative w-10 h-10 opacity-90 hover:opacity-100 transition-opacity" aria-label="Settings">
-          <Image src={settingsIcon} alt="Settings" fill sizes="40px" className="object-contain" />
+        <button onClick={() => router.push('/dashboard/student/settings')} className="relative w-[26px] h-[26px] opacity-90 hover:opacity-100 transition-opacity flex items-center justify-center" aria-label="Settings">
+          <Image src={settingsIcon} alt="Settings" fill sizes="26px" className="object-contain" />
         </button>
 
-        <div className="relative" ref={profileRef}>
+        <div className="relative flex items-center" ref={profileRef}>
           <button
             onClick={() => setIsProfileOpen((value) => !value)}
-            className="relative w-9 h-9 rounded-full overflow-hidden border border-[#5C3D1A] bg-[#8B6340] flex items-center justify-center text-white font-sans text-xs hover:border-[#C8922A] transition-colors"
+            className="relative w-[34px] h-[34px] rounded-full overflow-hidden border border-[#5C3D1A] bg-[#8B6340] flex items-center justify-center text-white font-sans text-[11px] font-bold hover:border-[#C8922A] transition-colors"
             aria-label="Profile"
           >
             {user?.avatar_url ? <img src={user.avatar_url} alt={displayName(user)} className="h-full w-full object-cover" /> : initials(user?.full_name, user?.email)}

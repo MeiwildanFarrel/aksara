@@ -15,6 +15,8 @@ export default function StudentDashboard() {
     mmr: 1500, tier: 'Silver', next: { label: 'Gold', target: 1800 }, 
     progressToNext: 0, winRate: 0, difficultyClimb: 1, streak: 0, totalQuiz: 0 
   })
+  const [dailyQuizTopic, setDailyQuizTopic] = useState('Cognitive Sciences')
+  const [dailyQuizResult, setDailyQuizResult] = useState<{ date: string; topic: string; results: boolean[]; mmrGained: number } | null>(null)
 
   useEffect(() => {
     async function checkUser() {
@@ -42,6 +44,11 @@ export default function StudentDashboard() {
             const activeIds = new Set(activeSessions.map((s: any) => s.id))
             sessionsList = parsed.filter((s: any) => activeIds.has(s.id))
             setJoinedSessions(sessionsList)
+            if (sessionsList.length > 0) {
+               // Use day of year to deterministically pick a "random" topic daily
+               const dayOfYear = Math.floor((new Date().getTime() - new Date().getTimezoneOffset() * 60000) / 86400000)
+               setDailyQuizTopic(sessionsList[dayOfYear % sessionsList.length].title)
+            }
           } else {
             setJoinedSessions([])
           }
@@ -85,6 +92,22 @@ export default function StudentDashboard() {
       }
     }
     loadSessionsAndStats()
+
+    // Load daily quiz result from localStorage
+    const saved = localStorage.getItem('daily_quiz_result')
+    if (saved) {
+      const parsed = JSON.parse(saved)
+      const today = new Date().toISOString().split('T')[0]
+      // Reset at 5am local: compare date
+      const now = new Date()
+      const resetHour = new Date()
+      resetHour.setHours(5, 0, 0, 0)
+      if (parsed.date === today && now >= resetHour) {
+        setDailyQuizResult(parsed)
+      } else if (parsed.date !== today) {
+        localStorage.removeItem('daily_quiz_result')
+      }
+    }
   }, [])
 
   if (isCheckingSession) {
@@ -168,51 +191,99 @@ export default function StudentDashboard() {
               
               {['Diamond', 'Platinum', 'Gold', 'Silver', 'Bronze'].map((t) => {
                 const isActive = t === tier
+                let mmrRange = ''
+                if (t === 'Diamond') mmrRange = '2,800+ MMR'
+                else if (t === 'Platinum') mmrRange = '2,400 - 2,799 MMR'
+                else if (t === 'Gold') mmrRange = '1,800 - 2,399 MMR'
+                else if (t === 'Silver') mmrRange = '1,500 - 1,799 MMR'
+                else mmrRange = '0 - 1,499 MMR'
+
                 return (
-                  <div key={t} className="flex items-center gap-4 relative z-10 my-2">
-                    <div className={`w-10 h-10 rounded-full flex items-center justify-center transition-all ${isActive ? 'bg-[#F2D078] border-[3px] border-[#382818] shadow-[0_0_0_2px_#F2D078]' : 'bg-[#4E3B27]'}`}>
-                      {t === 'Diamond' && <svg className={`w-4 h-4 ${isActive ? 'text-[#845A17]' : 'text-[#8C7A67]'}`} fill="currentColor" viewBox="0 0 20 20"><path d="M10 2l6 5-6 11L4 7l6-5z" /></svg>}
-                      {t === 'Platinum' && <svg className={`w-4 h-4 ${isActive ? 'text-[#845A17]' : 'text-[#8C7A67]'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z" /></svg>}
-                      {t === 'Gold' && <svg className={`w-4 h-4 ${isActive ? 'text-[#845A17]' : 'text-[#8C7A67]'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}><path strokeLinecap="round" strokeLinejoin="round" d="M5 15l7-7 7 7" /></svg>}
-                      {t === 'Silver' && <svg className={`w-4 h-4 ${isActive ? 'text-[#845A17]' : 'text-[#8C7A67]'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M5 15l7-7 7 7" /></svg>}
-                      {t === 'Bronze' && <div className={`w-2.5 h-2.5 rotate-45 ${isActive ? 'bg-[#845A17]' : 'border-[2px] border-[#8C7A67]'}`}></div>}
+                  <div key={t} className="flex items-center gap-4 relative z-10 py-2.5 px-3 -mx-3 rounded-2xl group cursor-pointer transition-all duration-300 hover:scale-[1.04] hover:-translate-y-1 hover:bg-[#4E3B27] hover:shadow-[0_10px_30px_rgba(0,0,0,0.35)] hover:z-20 border border-transparent hover:border-[#6D4C2B]">
+                    <div className={`w-10 h-10 rounded-full flex items-center justify-center transition-all duration-300 shrink-0 ${isActive ? 'bg-[#F2D078] border-[3px] border-[#382818] shadow-[0_0_0_2px_#F2D078] group-hover:border-[#4E3B27]' : 'bg-[#4E3B27] group-hover:bg-[#5A4530]'}`}>
+                      {t === 'Diamond' && <svg className={`w-4 h-4 transition-colors ${isActive ? 'text-[#845A17]' : 'text-[#8C7A67] group-hover:text-[#F2D078]'}`} fill="currentColor" viewBox="0 0 20 20"><path d="M10 2l6 5-6 11L4 7l6-5z" /></svg>}
+                      {t === 'Platinum' && <svg className={`w-4 h-4 transition-colors ${isActive ? 'text-[#845A17]' : 'text-[#8C7A67] group-hover:text-[#F2D078]'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z" /></svg>}
+                      {t === 'Gold' && <svg className={`w-4 h-4 transition-colors ${isActive ? 'text-[#845A17]' : 'text-[#8C7A67] group-hover:text-[#F2D078]'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}><path strokeLinecap="round" strokeLinejoin="round" d="M5 15l7-7 7 7" /></svg>}
+                      {t === 'Silver' && <svg className={`w-4 h-4 transition-colors ${isActive ? 'text-[#845A17]' : 'text-[#8C7A67] group-hover:text-[#F2D078]'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M5 15l7-7 7 7" /></svg>}
+                      {t === 'Bronze' && <div className={`w-2.5 h-2.5 rotate-45 transition-colors ${isActive ? 'bg-[#845A17]' : 'border-[2px] border-[#8C7A67] group-hover:border-[#F2D078]'}`}></div>}
                     </div>
-                    <span className={`font-sans text-[14px] font-semibold ${isActive ? 'text-[#F2D078]' : 'text-[#8C7A67]'}`}>{t}</span>
+                    <span className={`font-sans text-[14px] font-semibold transition-colors duration-300 ${isActive ? 'text-[#F2D078]' : 'text-[#8C7A67] group-hover:text-[#F8F3EC]'}`}>{t}</span>
+                    
+                    <div className="ml-auto opacity-0 translate-x-3 group-hover:opacity-100 group-hover:translate-x-0 transition-all duration-300 delay-75">
+                      <span className="text-[10px] font-bold font-sans text-[#F2D078] bg-[#312213] px-2.5 py-1.5 rounded-md border border-[#5A4530] shadow-inner whitespace-nowrap">
+                        {mmrRange}
+                      </span>
+                    </div>
                   </div>
                 )
               })}
             </div>
           </div>
 
-          {/* Daily Quest Card */}
+          {/* Daily Quiz Card */}
           <div className="bg-[#FAEFE2] rounded-3xl p-7 border border-[#EFDECD] shadow-sm flex flex-col relative overflow-hidden">
-            <div className="absolute top-6 right-6 bg-[#A1EDBB] text-[#1E5D36] px-3 py-1 rounded-full text-[11px] font-bold font-sans">
-              +250 XP
+            <div className={`absolute top-6 right-6 px-3 py-1 rounded-full text-[11px] font-bold font-sans ${
+              dailyQuizResult ? 'bg-[#FDE2A6] text-[#7A5200]' : 'bg-[#A1EDBB] text-[#1E5D36]'
+            }`}>
+              {dailyQuizResult ? `+${dailyQuizResult.mmrGained} MMR` : '+250 XP'}
             </div>
-            <h3 className="font-heading text-[22px] font-bold text-[#20150A] mb-1">Daily Quest</h3>
-            <p className="font-sans text-[13px] text-[#71604F] mb-6">Applied Cognitive Psychology MCQ</p>
+            <h3 className="font-heading text-[22px] font-bold text-[#20150A] mb-1">Daily Quiz</h3>
+            <p className="font-sans text-[13px] text-[#71604F] mb-6">{dailyQuizResult ? dailyQuizResult.topic : dailyQuizTopic}</p>
             
-            <div className="flex justify-between items-end mb-2">
-              <span className="font-sans text-[12px] font-bold text-[#6D5226]">Progress: 3 / 5 Solved</span>
-              <span className="font-sans text-[11px] text-[#93806C]">Next reward: 15 MMR</span>
-            </div>
-            
-            <div className="w-full bg-[#E5D5C1] h-2.5 rounded-full overflow-hidden mb-6 relative">
-              <div className="bg-[#1A8B49] h-full" style={{ width: '60%' }}></div>
-              <div className="absolute top-1/2 -translate-y-1/2 w-3.5 h-3.5 bg-white border-2 border-[#1A8B49] rounded-full shadow-sm" style={{ left: 'calc(60% - 7px)' }}></div>
-            </div>
-
-            <div className="flex gap-2 mb-8">
-              {[1, 2, 3, 4, 5].map((q) => (
-                <div key={q} className={`flex-1 aspect-[5/4] rounded-lg border flex items-center justify-center font-sans text-[13px] font-bold transition-colors ${q <= 3 ? 'bg-white border-[#1A8B49] text-[#1A8B49]' : 'bg-white border-[#E8DCCB] text-[#93806C]'}`}>
-                  {q <= 3 ? <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg> : q}
+            {dailyQuizResult ? (
+              <>
+                <div className="flex justify-between items-end mb-2">
+                  <span className="font-sans text-[12px] font-bold text-[#6D5226]">
+                    Progress: {dailyQuizResult.results.filter(Boolean).length} / 5 Solved
+                  </span>
+                  <span className="font-sans text-[11px] text-[#1A8B49] font-bold">✓ Completed</span>
                 </div>
-              ))}
-            </div>
-
-            <button onClick={() => router.push('/dashboard/student/sessions')} className="mt-auto w-full bg-[#825C17] hover:bg-[#684911] text-white py-3.5 rounded-[14px] font-sans font-bold transition-colors shadow-md text-[14px]">
-              Continue Session
-            </button>
+                <div className="w-full bg-[#E5D5C1] h-2.5 rounded-full overflow-hidden mb-6">
+                  <div 
+                    className="bg-[#1A8B49] h-full transition-all duration-1000" 
+                    style={{ width: `${(dailyQuizResult.results.filter(Boolean).length / 5) * 100}%` }}
+                  />
+                </div>
+                <div className="flex gap-2 mb-8">
+                  {dailyQuizResult.results.map((correct, i) => (
+                    <div key={i} className={`flex-1 aspect-[5/4] rounded-lg border-2 flex items-center justify-center font-sans text-[12px] font-bold transition-colors ${
+                      correct
+                        ? 'bg-white border-[#1A8B49] text-[#1A8B49]'
+                        : 'bg-[#FDF0F0] border-[#E8B4B8] text-[#C0392B]'
+                    }`}>
+                      {correct
+                        ? <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg>
+                        : <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
+                      }
+                    </div>
+                  ))}
+                </div>
+                <button onClick={() => router.push('/dashboard/student/daily-quiz?review=1')} className="mt-auto w-full bg-[#5C3D1A] hover:bg-[#3F2810] text-white py-3.5 rounded-[14px] font-sans font-bold transition-colors shadow-md text-[14px] flex items-center justify-center gap-2">
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path strokeLinecap="round" strokeLinejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>
+                  Review Jawaban
+                </button>
+              </>
+            ) : (
+              <>
+                <div className="flex justify-between items-end mb-2">
+                  <span className="font-sans text-[12px] font-bold text-[#6D5226]">Progress: 0 / 5 Solved</span>
+                  <span className="font-sans text-[11px] text-[#93806C]">Next reward: 15 MMR</span>
+                </div>
+                <div className="w-full bg-[#E5D5C1] h-2.5 rounded-full overflow-hidden mb-6">
+                  <div className="bg-[#1A8B49] h-full transition-all duration-1000" style={{ width: '0%' }} />
+                </div>
+                <div className="flex gap-2 mb-8">
+                  {[1, 2, 3, 4, 5].map((q) => (
+                    <div key={q} className="flex-1 aspect-[5/4] rounded-lg border flex items-center justify-center font-sans text-[13px] font-bold bg-white border-[#E8DCCB] text-[#93806C]">
+                      {q}
+                    </div>
+                  ))}
+                </div>
+                <button onClick={() => router.push('/dashboard/student/daily-quiz')} className="mt-auto w-full bg-[#825C17] hover:bg-[#684911] text-white py-3.5 rounded-[14px] font-sans font-bold transition-colors shadow-md text-[14px]">
+                  Continue Session
+                </button>
+              </>
+            )}
           </div>
 
           {/* Stats Grid & Scholar Badge Wrapper */}
