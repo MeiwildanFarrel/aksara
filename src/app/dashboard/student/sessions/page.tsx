@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '../../../../../lib/supabase/client'
 import StudentNav from '../components/StudentNav'
@@ -11,8 +11,8 @@ export default function StudentSessions() {
   const [activeFilter, setActiveFilter] = useState('Semua')
   const [joinedSessions, setJoinedSessions] = useState<any[]>([])
   const [sessionStats, setSessionStats] = useState<Record<string, { nodes: number, completed: number }>>({})
-  const [instructorProfiles, setInstructorProfiles] = useState<Record<string, { full_name: string | null, avatar_url: string | null }>>({}) 
-  
+  const [instructorProfiles, setInstructorProfiles] = useState<Record<string, { full_name: string | null, avatar_url: string | null }>>({})
+
   // Modal states
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [pin, setPin] = useState(['', '', '', '', '', ''])
@@ -20,50 +20,35 @@ export default function StudentSessions() {
   const [isPinLoading, setIsPinLoading] = useState(false)
   const inputRefs = useRef<(HTMLInputElement | null)[]>([])
 
+  const loadSessions = useCallback(async () => {
+    const res = await fetch('/api/student/sessions')
+    if (!res.ok) return
+    const sessions = await res.json()
+    setJoinedSessions(sessions)
+
+    const uniqueInstructorIds = [...new Set(sessions.map((s: any) => s.instructor_id).filter(Boolean))] as string[]
+    if (uniqueInstructorIds.length > 0) {
+      const supabase = createClient()
+      const { data: usersData } = await supabase
+        .from('users')
+        .select('id, full_name, avatar_url')
+        .in('id', uniqueInstructorIds)
+      if (usersData) {
+        const profiles: Record<string, { full_name: string | null, avatar_url: string | null }> = {}
+        usersData.forEach((u: any) => { profiles[u.id] = { full_name: u.full_name, avatar_url: u.avatar_url } })
+        setInstructorProfiles(profiles)
+      }
+    }
+  }, [])
+
   useEffect(() => {
     async function init() {
       const res = await fetch('/api/user/me')
       if (res.ok) setUser(await res.json())
-
-      const saved = localStorage.getItem('student_sessions')
-      if (saved) {
-        const sessions = JSON.parse(saved)
-        
-        const supabase = createClient()
-        const sessionIds = sessions.map((s: any) => s.id)
-        if (sessionIds.length > 0) {
-           const { data: activeSessions } = await (supabase as any)
-             .from('sessions')
-             .select('id, status')
-             .in('id', sessionIds)
-             .eq('status', 'Active')
-             
-           if (activeSessions) {
-             const activeIds = new Set(activeSessions.map((s: any) => s.id))
-             const filteredSessions = sessions.filter((s: any) => activeIds.has(s.id))
-             setJoinedSessions(filteredSessions)
-
-             // Fetch instructor profiles from DB as fallback
-             // (session.instructor from localStorage takes priority in display)
-             const uniqueInstructorIds = [...new Set(filteredSessions.map((s: any) => s.instructor_id).filter(Boolean))] as string[]
-             if (uniqueInstructorIds.length > 0) {
-               const { data: usersData } = await supabase
-                 .from('users')
-                 .select('id, full_name, avatar_url')
-                 .in('id', uniqueInstructorIds)
-               
-               if (usersData) {
-                 const profiles: Record<string, { full_name: string | null, avatar_url: string | null }> = {}
-                 usersData.forEach((u: any) => { profiles[u.id] = { full_name: u.full_name, avatar_url: u.avatar_url } })
-                 setInstructorProfiles(profiles)
-               }
-             }
-           }
-        }
-      }
+      await loadSessions()
     }
     init()
-  }, [])
+  }, [loadSessions])
 
   useEffect(() => {
     async function loadStats() {
@@ -78,7 +63,7 @@ export default function StudentSessions() {
           .from('skill_nodes')
           .select('id')
           .eq('session_id', s.id)
-        
+
         const nodeCount = nodes?.length || 0
         let completedCount = 0
 
@@ -96,7 +81,7 @@ export default function StudentSessions() {
       }
       setSessionStats(stats)
     }
-    
+
     if (joinedSessions.length > 0) {
       loadStats()
     }
@@ -151,24 +136,14 @@ export default function StudentSessions() {
       setIsPinLoading(true)
       const res = await fetch(`/api/session/${fullPin}`)
       if (res.ok) {
-        const sessionData = await res.json()
-        
-        const existing = JSON.parse(localStorage.getItem('student_sessions') || '[]')
-        if (!existing.find((s: any) => s.id === sessionData.id)) {
-          sessionData.pin = fullPin
-          existing.push(sessionData)
-          localStorage.setItem('student_sessions', JSON.stringify(existing))
-          setJoinedSessions(existing)
-        }
-
-        // Close modal and reset pin
         setIsModalOpen(false)
         setPin(['', '', '', '', '', ''])
+        await loadSessions()
       } else {
         const data = await res.json()
         setPinError(data.error || 'Gagal menemukan sesi.')
       }
-    } catch (err) {
+    } catch {
       setPinError('Terjadi kesalahan jaringan.')
     } finally {
       setIsPinLoading(false)
@@ -177,7 +152,7 @@ export default function StudentSessions() {
 
   return (
     <div className="min-h-screen bg-[#FBF7F0] flex flex-col items-center">
-      
+
       <StudentNav active="sessions" user={user} />
 
       {/* Main Content */}
@@ -188,7 +163,7 @@ export default function StudentSessions() {
             <h1 className="font-heading text-[32px] font-bold text-[#2C1A08] mb-2">Materi & Quest Saya</h1>
             <p className="font-sans text-[15px] text-[#5C3D1A]">Lanjutkan perjalanan intelektual Anda hari ini.</p>
           </div>
-          
+
           {/* Filters */}
           <div className="flex bg-[#F5EFE4] rounded-xl p-1 border border-[#EDE4D3]">
             {['Semua', 'Sedang Dipelajari', 'Selesai'].map((filter) => (
@@ -196,8 +171,8 @@ export default function StudentSessions() {
                 key={filter}
                 onClick={() => setActiveFilter(filter)}
                 className={`px-5 py-2 rounded-lg font-sans text-[13px] font-semibold transition-all ${
-                  activeFilter === filter 
-                    ? 'bg-white text-[#2C1A08] shadow-sm' 
+                  activeFilter === filter
+                    ? 'bg-white text-[#2C1A08] shadow-sm'
                     : 'text-[#8B6340] hover:text-[#5C3D1A]'
                 }`}
               >
@@ -211,13 +186,18 @@ export default function StudentSessions() {
         <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
 
           {/* Dynamic Sessions */}
-          {joinedSessions.map((session, i) => {
+          {joinedSessions.map((session) => {
             const stats = sessionStats[session.id] || { nodes: 0, completed: 0 }
             const progress = stats.nodes > 0 ? Math.round((stats.completed / stats.nodes) * 100) : 0
             const isCompleted = stats.nodes > 0 && stats.completed === stats.nodes
 
             if (activeFilter === 'Selesai' && !isCompleted) return null
             if (activeFilter === 'Sedang Dipelajari' && (progress === 0 || isCompleted)) return null
+
+            const iProfile = instructorProfiles[session.instructor_id]
+            const name = iProfile?.full_name || 'Dosen Aksara'
+            const avatarUrl = iProfile?.avatar_url
+            const initials = name.split(' ').map((n: string) => n[0]).join('').substring(0, 2).toUpperCase()
 
             return (
               <div key={session.id} className="bg-white rounded-3xl p-8 border border-[#EDE4D3] shadow-[0_2px_20px_rgb(44,26,8,0.04)] flex flex-col">
@@ -236,29 +216,17 @@ export default function StudentSessions() {
                   )}
                 </div>
                 <h2 className="font-heading text-[22px] font-bold text-[#2C1A08] leading-tight mb-2">{session.title}</h2>
-                
+
                 {/* Instructor Info */}
-                {(() => {
-                  // Priority: session.instructor (stored in localStorage from API at join time,
-                  // includes Auth metadata full_name) → DB profile fallback → email → default
-                  const instructorObj = Array.isArray(session.instructor) ? session.instructor[0] : session.instructor
-                  const usersObj = Array.isArray(session.users) ? session.users[0] : session.users
-                  const iProfile = instructorProfiles[session.instructor_id]
-                  const name = instructorObj?.full_name || usersObj?.full_name || iProfile?.full_name || instructorObj?.email?.split('@')[0] || usersObj?.email?.split('@')[0] || 'Dosen Aksara'
-                  const avatarUrl = instructorObj?.avatar_url || usersObj?.avatar_url || iProfile?.avatar_url
-                  const initials = name.split(' ').map((n: string) => n[0]).join('').substring(0, 2).toUpperCase()
-                  return (
-                    <div className="flex items-center gap-2 mb-6">
-                      <div className="w-7 h-7 rounded-full bg-[#FAF3EC] border border-[#E8DCCB] flex items-center justify-center text-[10px] font-bold text-[#8B6340] overflow-hidden shrink-0">
-                        {avatarUrl ? (
-                          <img src={avatarUrl} alt={name} className="w-full h-full object-cover" />
-                        ) : initials}
-                      </div>
-                      <p className="font-sans text-[13px] text-[#5C3D1A]">Instructor: <span className="font-semibold">{name}</span></p>
-                    </div>
-                  )
-                })()}
-                
+                <div className="flex items-center gap-2 mb-6">
+                  <div className="w-7 h-7 rounded-full bg-[#FAF3EC] border border-[#E8DCCB] flex items-center justify-center text-[10px] font-bold text-[#8B6340] overflow-hidden shrink-0">
+                    {avatarUrl ? (
+                      <img src={avatarUrl} alt={name} className="w-full h-full object-cover" />
+                    ) : initials}
+                  </div>
+                  <p className="font-sans text-[13px] text-[#5C3D1A]">Instructor: <span className="font-semibold">{name}</span></p>
+                </div>
+
                 <div className="mt-auto">
                   <div className="flex justify-between items-center mb-2">
                     <span className="font-sans text-[12px] text-[#8B6340]">Progress Belajar</span>
@@ -267,7 +235,7 @@ export default function StudentSessions() {
                   <div className="w-full bg-[#EDE4D3] h-2 rounded-full mb-4 overflow-hidden">
                     <div className={`${isCompleted ? 'bg-[#196F3D]' : 'bg-[#C8922A]'} h-full rounded-full transition-all duration-500`} style={{ width: `${progress}%` }}></div>
                   </div>
-                  
+
                   <div className="flex gap-4 mb-6">
                     <div className="flex items-center gap-1.5">
                       <svg className="w-3.5 h-3.5 text-[#A67520]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -282,7 +250,7 @@ export default function StudentSessions() {
                       <span className="font-sans text-[12px] text-[#5C3D1A]">{stats.nodes} Quests</span>
                     </div>
                   </div>
-                  
+
                   <button onClick={() => router.push(`/session/${session.pin}`)} className="w-full bg-[#C8922A] hover:bg-[#A67520] text-white py-3 rounded-xl font-sans font-semibold transition-colors flex items-center justify-center gap-2 shadow-sm">
                     {progress > 0 ? 'Lanjutkan Sesi' : 'Mulai Sesi'}
                     <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
@@ -304,7 +272,7 @@ export default function StudentSessions() {
             )
           })}
 
-          {/* Card Add New PIN (Image 1) */}
+          {/* Card Add New PIN */}
           {(activeFilter === 'Semua') && (
             <div className="bg-[#261705] rounded-3xl p-8 border border-[#3E2610] shadow-lg flex flex-col items-center justify-center text-center relative overflow-hidden">
               <div className="absolute top-4 right-4 opacity-10">
@@ -313,7 +281,7 @@ export default function StudentSessions() {
                    <path d="M4 10h16v4H4z" />
                  </svg>
               </div>
-              
+
               <div className="relative z-10 w-full flex flex-col items-center">
                 <div className="mb-4 text-[#EAB308]">
                   <svg className="w-12 h-12" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
@@ -334,11 +302,11 @@ export default function StudentSessions() {
         </div>
       </main>
 
-      {/* Modal PIN Input (Image 2) */}
+      {/* Modal PIN Input */}
       {isModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#FBF7F0]/90 backdrop-blur-sm p-4 transition-all">
           <div className="bg-white rounded-[32px] p-10 max-w-md w-full shadow-2xl border border-[#EDE4D3] text-center relative flex flex-col items-center animate-in fade-in zoom-in duration-300">
-            
+
             <div className="w-14 h-14 rounded-full bg-[#FAE8B0]/40 flex items-center justify-center mb-6 text-[#A67520]">
                <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
@@ -388,7 +356,7 @@ export default function StudentSessions() {
               {isPinLoading ? 'Mengecek...' : 'Konfirmasi'}
             </button>
 
-            <button 
+            <button
               onClick={() => setIsModalOpen(false)}
               className="mt-6 font-sans text-[12px] font-semibold text-[#5C3D1A] hover:text-[#2C1A08] transition-colors flex items-center gap-1.5"
             >
@@ -399,7 +367,7 @@ export default function StudentSessions() {
             </button>
 
           </div>
-          
+
           <div className="absolute bottom-10 flex items-center gap-1.5 opacity-40">
              <div className="w-2 h-2 rounded-full bg-[#D4AF37]"></div>
              <div className="w-2 h-2 rounded-full bg-[#D4AF37] opacity-60"></div>

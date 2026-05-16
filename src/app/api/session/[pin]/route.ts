@@ -132,6 +132,17 @@ export async function GET(
       )
     }
 
+    // Enroll authenticated student into the session
+    const { data: { user: authUser } } = await supabase.auth.getUser()
+    if (authUser) {
+      await (supabase as any)
+        .from('student_sessions')
+        .upsert(
+          { student_id: authUser.id, session_id: session.id },
+          { onConflict: 'student_id,session_id' }
+        )
+    }
+
     const { data: chunks } = await supabase
       .from('pdf_chunks')
       .select('content, source_ref')
