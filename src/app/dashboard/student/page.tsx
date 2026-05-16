@@ -12,7 +12,7 @@ export default function StudentDashboard() {
   const [joinedSessions, setJoinedSessions] = useState<any[]>([])
   
   const [mmrData, setMmrData] = useState({
-    mmr: 0, tier: 'Bronze', next: { label: 'Silver', target: 1500 },
+    mmr: 0, tier: 'Bronze', next: { label: 'Silver', target: 1000 },
     progressToNext: 0, winRate: 0, difficultyClimb: 0, streak: 0, totalQuiz: 0,
     division: 'NOVICE SCHOLAR'
   })
@@ -61,7 +61,13 @@ export default function StudentDashboard() {
       const supabase = createClient()
       const { data: auth } = await supabase.auth.getUser()
       if (auth.user) {
-        const { data: scores } = await supabase.from('mastery_scores').select('score').eq('user_id', auth.user.id)
+        const [
+          { data: scores },
+          { count: correctCount },
+        ] = await Promise.all([
+          supabase.from('mastery_scores').select('score').eq('user_id', auth.user.id),
+          supabase.from('quest_attempts').select('*', { count: 'exact', head: true }).eq('user_id', auth.user.id).eq('is_correct', true),
+        ])
         const hasScores = !!scores && scores.length > 0
         let avg = 0
         let winRate = 0
@@ -69,22 +75,22 @@ export default function StudentDashboard() {
            avg = scores.reduce((sum: number, s: any) => sum + (s.score || 0), 0) / scores.length
            winRate = Math.round((scores.filter((s: any) => s.score >= 0.85).length / scores.length) * 100) || 0
         }
-        const mmr = hasScores ? Math.max(0, Math.round(avg * 2900)) : 0
+        const mmr = (correctCount ?? 0) * 50
 
         let tier = 'Bronze'
-        let next = { label: 'Silver', target: 1500 }
+        let next = { label: 'Silver', target: 1000 }
         let division = 'NOVICE SCHOLAR'
-        if (mmr >= 2800) { tier = 'Diamond'; next = { label: 'Max Rank', target: 2900 }; division = 'MASTER SCHOLAR' }
-        else if (mmr >= 2400) { tier = 'Platinum'; next = { label: 'Diamond', target: 2800 }; division = 'ELITE SCHOLAR' }
-        else if (mmr >= 1800) { tier = 'Gold'; next = { label: 'Platinum', target: 2400 }; division = 'ADEPT SCHOLAR' }
-        else if (mmr >= 1500) { tier = 'Silver'; next = { label: 'Gold', target: 1800 }; division = 'APPRENTICE SCHOLAR' }
+        if (mmr >= 5000) { tier = 'Diamond'; next = { label: 'Max Rank', target: 5000 }; division = 'MASTER SCHOLAR' }
+        else if (mmr >= 3500) { tier = 'Platinum'; next = { label: 'Diamond', target: 5000 }; division = 'ELITE SCHOLAR' }
+        else if (mmr >= 2000) { tier = 'Gold'; next = { label: 'Platinum', target: 3500 }; division = 'ADEPT SCHOLAR' }
+        else if (mmr >= 1000) { tier = 'Silver'; next = { label: 'Gold', target: 2000 }; division = 'APPRENTICE SCHOLAR' }
 
         let progressToNext = 0
-        if (mmr >= 2800) progressToNext = 100
-        else if (tier === 'Bronze') progressToNext = Math.round((mmr / 1500) * 100)
-        else if (tier === 'Silver') progressToNext = Math.round(((mmr - 1500) / 300) * 100)
-        else if (tier === 'Gold') progressToNext = Math.round(((mmr - 1800) / 600) * 100)
-        else if (tier === 'Platinum') progressToNext = Math.round(((mmr - 2400) / 400) * 100)
+        if (mmr >= 5000) progressToNext = 100
+        else if (tier === 'Bronze') progressToNext = Math.round((mmr / 1000) * 100)
+        else if (tier === 'Silver') progressToNext = Math.round(((mmr - 1000) / 1000) * 100)
+        else if (tier === 'Gold') progressToNext = Math.round(((mmr - 2000) / 1500) * 100)
+        else if (tier === 'Platinum') progressToNext = Math.round(((mmr - 3500) / 1500) * 100)
 
         // Count total quests available across all joined sessions
         let totalQuizCount = 0

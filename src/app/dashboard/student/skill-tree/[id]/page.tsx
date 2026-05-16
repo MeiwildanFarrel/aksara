@@ -161,6 +161,7 @@ function StudentSkillTreePage({ sessionId }: { sessionId: string }) {
   const [activeSessionId, setActiveSessionId] = useState('')
   const [nodes, setNodes] = useState<SkillNode[]>([])
   const [scores, setScores] = useState<Record<string, number>>({})
+  const [correctCount, setCorrectCount] = useState(0)
   const [isLoading, setIsLoading] = useState(true)
 
   // Load user + joined sessions
@@ -219,6 +220,15 @@ function StudentSkillTreePage({ sessionId }: { sessionId: string }) {
       const nextScores: Record<string, number> = {}
       masteryRows.forEach(row => { if (row.node_id) nextScores[row.node_id] = row.score ?? 0 })
 
+      if (auth.user) {
+        const { count } = await supabase
+          .from('quest_attempts')
+          .select('*', { count: 'exact', head: true })
+          .eq('user_id', auth.user.id)
+          .eq('is_correct', true)
+        setCorrectCount(count ?? 0)
+      }
+
       setNodes(fetchedNodes)
       setScores(nextScores)
       setIsLoading(false)
@@ -243,12 +253,8 @@ function StudentSkillTreePage({ sessionId }: { sessionId: string }) {
     [sortedNodes, scores],
   )
 
-  // MMR & tier — computed from ALL user mastery scores (global, not per-session)
-  const allScoreValues = Object.values(scores)
-  const globalAvg = allScoreValues.length > 0
-    ? allScoreValues.reduce((sum, s) => sum + s, 0) / allScoreValues.length
-    : 0
-  const mmr = Math.max(0, Math.round(globalAvg * 5000))
+  // MMR & tier — cumulative: setiap jawaban benar = +50 MMR
+  const mmr = correctCount * 50
   const tier = tierFromMmr(mmr)
   const next = nextTier(mmr)
   const progressToNext = next.label === 'Max Rank'
