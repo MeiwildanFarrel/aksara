@@ -65,7 +65,8 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({
         ...existingUser,
         // Keep avatars out of Auth metadata; large data URLs there inflate SSR cookies.
-        full_name: user.user_metadata?.full_name ?? existingUser.full_name ?? null,
+        // Prefer the public.users profile because OAuth/Auth metadata can be stale after logout/login.
+        full_name: existingUser.full_name ?? user.user_metadata?.full_name ?? null,
         avatar_url: existingUser.avatar_url ?? null,
         phone: existingUser.phone ?? user.user_metadata?.phone ?? null,
         nim: existingUser.nim ?? user.user_metadata?.nim ?? null,

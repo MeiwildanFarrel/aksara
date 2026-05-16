@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import Image from 'next/image'
 import { createClient } from '../../../../../../lib/supabase/client'
-import { ChevronRight, ChevronDown, PenSquare, Share2, Play, Users, BarChart, FileText, Download, Upload, Copy, Save, Home, BookOpen, BarChart2, Settings, HelpCircle, LogOut, CheckCircle2, Clock, MapPin, Tag, X, Eye } from 'lucide-react'
+import { ChevronRight, ChevronDown, PenSquare, Share2, Play, Users, BarChart, FileText, Download, Upload, Copy, Save, Home, BookOpen, BarChart2, BrainCircuit, Settings, HelpCircle, LogOut, CheckCircle2, Clock, MapPin, Tag, X, Eye } from 'lucide-react'
 
 import addCoursesIcon from '../../../../public/add_courses.png'
 import analyticsIcon from '../../../../public/analytics.png'
@@ -32,6 +32,7 @@ interface UserData {
   role: string
   full_name?: string
   avatar_url?: string
+  university?: string
 }
 
 export default function SessionManagement({ params }: { params: { id: string } }) {
@@ -291,7 +292,7 @@ export default function SessionManagement({ params }: { params: { id: string } }
               )}
             </div>
             <h2 className="font-heading text-xl font-bold text-[#5C3D1A] text-center">{user?.full_name || 'Dosen'}</h2>
-            <p className="text-sm text-[#8B6340]">Senior Lecturer</p>
+            <p className="text-sm text-[#8B6340]">{user?.university || 'Akademisi'}</p>
           </div>
 
           <nav className="flex flex-col gap-2">
@@ -299,19 +300,25 @@ export default function SessionManagement({ params }: { params: { id: string } }
               onClick={() => router.push('/dashboard/instructor')}
               className="flex items-center gap-3 w-full hover:bg-[#F3D580]/30 text-[#8B6340] rounded-xl px-4 py-3 font-medium transition-all">
               <Home size={18} />
-              Home
+              DASHBOARD
             </button>
             <button
               onClick={() => router.push('/dashboard/instructor/courses')}
               className="flex items-center gap-3 w-full bg-[#F3D580] text-[#5C3D1A] rounded-xl px-4 py-3 font-semibold transition-all">
               <BookOpen size={18} />
-              Add Courses
+              COURSES
             </button>
             <button
               onClick={() => router.push('/dashboard/instructor/analytics')}
               className="flex items-center gap-3 w-full hover:bg-[#F3D580]/30 text-[#8B6340] rounded-xl px-4 py-3 font-medium transition-all">
               <BarChart2 size={18} />
-              Analytics
+              ANALYTICS
+            </button>
+            <button
+              onClick={() => router.push('/dashboard/instructor/cognitive')}
+              className="flex items-center gap-3 w-full hover:bg-[#F3D580]/30 text-[#8B6340] rounded-xl px-4 py-3 font-medium transition-all">
+              <BrainCircuit size={18} />
+              COGNITIVE
             </button>
           </nav>
         </div>

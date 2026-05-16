@@ -24,6 +24,19 @@ type UserRow = {
   phone?: string | null
 }
 
+type SupabaseLikeError = { message: string }
+type LooseUsersTable = {
+  update(payload: Record<string, unknown>): {
+    eq(column: string, value: string): Promise<{ error: SupabaseLikeError | null }>
+  }
+  select(columns: string): {
+    in(column: string, values: string[]): Promise<{ data: unknown[] | null; error: SupabaseLikeError | null }>
+  }
+}
+type LooseAdminClient = {
+  from(table: 'users'): LooseUsersTable
+}
+
 function getServiceClient() {
   return createSupabaseAdmin<Database>(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -38,6 +51,37 @@ function displayName(user: UserRow) {
 function avg(values: number[]) {
   if (values.length === 0) return 0
   return values.reduce((sum, value) => sum + value, 0) / values.length
+}
+
+function avgNullable(values: Array<number | null>) {
+  return avg(values.filter((value): value is number => typeof value === 'number'))
+}
+
+function usersTable(admin: ReturnType<typeof getServiceClient>) {
+  return (admin as unknown as LooseAdminClient).from('users')
+}
+
+function metadataPhone(metadata: Record<string, unknown> | null | undefined) {
+  const value = metadata?.phone ?? metadata?.phone_number ?? metadata?.whatsapp ?? metadata?.whatsapp_number
+  return typeof value === 'string' && value.trim() ? value.trim() : null
+}
+
+async function resolveStudentPhone(
+  admin: ReturnType<typeof getServiceClient>,
+  student: UserRow,
+) {
+  if (student.phone?.trim()) return student.phone.trim()
+
+  const { data } = await admin.auth.admin.getUserById(student.id)
+  const authPhone = data.user?.phone?.trim() || metadataPhone(data.user?.user_metadata)
+
+  if (authPhone) {
+    await usersTable(admin)
+      .update({ phone: authPhone })
+      .eq('id', student.id)
+  }
+
+  return authPhone || null
 }
 
 export async function GET() {
@@ -174,9 +218,8 @@ export async function GET() {
       return NextResponse.json({ courses, students: [], summary: { avg_mastery: 0, at_risk: 0 } })
     }
 
-    const { data: usersData, error: usersErr } = await (admin as any)
-      .from('users')
-      .select('id, email, role, full_name')
+    const { data: usersData, error: usersErr } = await usersTable(admin)
+      .select('id, email, role, full_name, phone')
       .in('id', Array.from(userIds))
 
     if (usersErr) {
@@ -218,17 +261,21 @@ export async function GET() {
       }
     }
 
-    const students = studentUsers.map((student) => {
-      const courseScores: Record<string, number> = {}
+    const students = await Promise.all(studentUsers.map(async (student) => {
+      const phone = await resolveStudentPhone(admin, student)
+      const courseScores: Record<string, number | null> = {}
       const courseMap = scoresByStudentCourse.get(student.id) ?? new Map<string, number[]>()
       const attemptedCourses = attemptedCoursesByStudent.get(student.id) ?? new Set<string>()
 
       for (const course of courses) {
-        courseScores[course.id] = avg(courseMap.get(course.id) ?? [])
+        const scoreValues = courseMap.get(course.id) ?? []
+        courseScores[course.id] = scoreValues.length > 0 || attemptedCourses.has(course.id)
+          ? avg(scoreValues)
+          : null
       }
 
-      const masteryValues = Object.values(courseScores).filter((value) => value > 0)
-      const avgMastery = avg(masteryValues)
+      const masteryValues = Object.values(courseScores)
+      const avgMastery = avgNullable(masteryValues)
       const studentAttempts = attemptsByStudent.get(student.id) ?? []
       const correct = studentAttempts.filter((attempt) => attempt.is_correct === true).length
       const avgQuestScore = studentAttempts.length > 0 ? correct / studentAttempts.length : avgMastery
@@ -243,20 +290,20 @@ export async function GET() {
         streakDays: activeDays.size,
       })
       const missedSessions = courses.filter(
-        (course) => !attemptedCourses.has(course.id) && (courseScores[course.id] ?? 0) === 0,
+        (course) => courseScores[course.id] !== null && !attemptedCourses.has(course.id) && courseScores[course.id] === 0,
       ).length
 
       return {
         user_id: student.id,
         name: displayName(student),
         email: student.email ?? '',
-        phone: student.phone ?? null,
+        phone,
         course_scores: courseScores,
         avg_mastery: avgMastery,
         risk_score: riskScore,
         missed_sessions: missedSessions,
       }
-    })
+    }))
 
     students.sort((a, b) => b.risk_score - a.risk_score)
 

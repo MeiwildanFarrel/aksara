@@ -20,6 +20,21 @@ type UserRow = {
   phone?: string | null
 }
 
+type SupabaseLikeError = { message: string }
+type LooseUsersTable = {
+  update(payload: Record<string, unknown>): {
+    eq(column: string, value: string): Promise<{ error: SupabaseLikeError | null }>
+  }
+  select(columns: string): {
+    eq(column: string, value: string): {
+      maybeSingle(): Promise<{ data: unknown | null; error: SupabaseLikeError | null }>
+    }
+  }
+}
+type LooseAdminClient = {
+  from(table: 'users'): LooseUsersTable
+}
+
 function getServiceClient() {
   return createSupabaseAdmin<Database>(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -33,6 +48,33 @@ function normalizePhone(phone: string | null | undefined) {
   if (digits.startsWith('0')) return `62${digits.slice(1)}`
   if (digits.startsWith('62')) return digits
   return digits
+}
+
+function usersTable(admin: ReturnType<typeof getServiceClient>) {
+  return (admin as unknown as LooseAdminClient).from('users')
+}
+
+function metadataPhone(metadata: Record<string, unknown> | null | undefined) {
+  const value = metadata?.phone ?? metadata?.phone_number ?? metadata?.whatsapp ?? metadata?.whatsapp_number
+  return typeof value === 'string' && value.trim() ? value.trim() : null
+}
+
+async function resolveStudentPhone(
+  admin: ReturnType<typeof getServiceClient>,
+  student: UserRow,
+) {
+  if (student.phone?.trim()) return student.phone.trim()
+
+  const { data } = await admin.auth.admin.getUserById(student.id)
+  const authPhone = data.user?.phone?.trim() || metadataPhone(data.user?.user_metadata)
+
+  if (authPhone) {
+    await usersTable(admin)
+      .update({ phone: authPhone })
+      .eq('id', student.id)
+  }
+
+  return authPhone || null
 }
 
 function displayName(user: UserRow) {
@@ -83,9 +125,8 @@ export async function POST(request: NextRequest) {
 
     const admin = getServiceClient()
 
-    const { data: studentData, error: studentErr } = await (admin as any)
-      .from('users')
-      .select('id, email, role, full_name')
+    const { data: studentData, error: studentErr } = await usersTable(admin)
+      .select('id, email, role, full_name, phone')
       .eq('id', targetUserId)
       .maybeSingle()
 
@@ -179,7 +220,8 @@ export async function POST(request: NextRequest) {
       `Halo ${firstName}, saya melihat dari data pembelajaran AKSARA bahwa kamu perlu pendalaman lanjutan pada ${weakText}.\n\n` +
       `Apakah minggu ini ada waktu untuk sesi mentoring singkat? Saya ingin membantu kamu mengejar ketertinggalan materi. Balas pesan ini ya.`
 
-    const normalizedPhone = normalizePhone(student.phone)
+    const phone = await resolveStudentPhone(admin, student)
+    const normalizedPhone = normalizePhone(phone)
     const whatsappUrl = normalizedPhone
       ? `https://wa.me/${normalizedPhone}?text=${encodeURIComponent(message)}`
       : null
@@ -189,7 +231,7 @@ export async function POST(request: NextRequest) {
         id: student.id,
         name: studentName,
         email: student.email ?? '',
-        phone: student.phone ?? null,
+        phone,
         normalized_phone: normalizedPhone || null,
       },
       weak_nodes: weakNodes,

@@ -66,8 +66,8 @@ function SettingsProfilePage() {
         // Populate form
         setFullName(data.full_name || authUser.user_metadata?.full_name || '')
         setEmail(data.email || authUser.email || '')
-        setUniversity(authUser.user_metadata?.university || '')
-        setPhone(authUser.user_metadata?.phone || '')
+        setUniversity(data.university || authUser.user_metadata?.university || '')
+        setPhone(data.phone || authUser.user_metadata?.phone || '')
         setResearchField(authUser.user_metadata?.research_field || '')
         setAvatarUrl(data.avatar_url || authUser.user_metadata?.avatar_url || '')
       }

@@ -17,7 +17,19 @@ function getServiceClient() {
 interface StudentRow {
   user_id: string
   email: string
+  name: string
+  nim: string | null
+  tier: string | null
   scores: Record<string, number>
+}
+
+interface StudentProfileRow {
+  id: string
+  email: string | null
+  role: string | null
+  full_name?: string | null
+  nim?: string | null
+  tier?: string | null
 }
 
 export async function GET(request: NextRequest) {
@@ -159,9 +171,9 @@ export async function GET(request: NextRequest) {
     }
 
     // 8. Ambil profil student
-    const { data: usersData, error: usersErr } = await admin
+    const { data: usersData, error: usersErr } = await (admin as any)
       .from('users')
-      .select('id, email, role')
+      .select('id, email, role, full_name, nim, tier')
       .in('id', Array.from(userIds))
     if (usersErr) {
       return NextResponse.json(
@@ -170,7 +182,7 @@ export async function GET(request: NextRequest) {
       )
     }
 
-    const studentUsers = (usersData ?? []).filter((u) => u.role === 'student')
+    const studentUsers = ((usersData ?? []) as StudentProfileRow[]).filter((u) => u.role === 'student')
 
     // 9. Build map: userId → (nodeId → score)
     const scoreMap = new Map<string, Map<string, number>>()
@@ -190,6 +202,9 @@ export async function GET(request: NextRequest) {
       return {
         user_id: u.id,
         email: u.email ?? '',
+        name: u.full_name?.trim() || u.email?.split('@')[0] || 'Mahasiswa',
+        nim: u.nim ?? null,
+        tier: u.tier ?? null,
         scores,
       }
     })

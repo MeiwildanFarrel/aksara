@@ -30,7 +30,7 @@ type StudentRow = {
   name: string
   email: string
   phone: string | null
-  course_scores: Record<string, number>
+  course_scores: Record<string, number | null>
   avg_mastery: number
   risk_score: number
   missed_sessions: number
@@ -147,7 +147,7 @@ export default function CognitiveDashboardPage() {
 
   function sendWhatsApp() {
     if (!draft?.student.normalized_phone) {
-      setError('Nomor WhatsApp student belum tersedia di database users.phone.')
+      setError('Nomor WhatsApp student belum tersedia. Minta student mengisi Phone Number di Settings Profile.')
       return
     }
 
@@ -277,11 +277,11 @@ export default function CognitiveDashboardPage() {
                       <tr key={student.user_id} className="text-sm">
                         <td className="px-4 py-2 font-bold text-[#2C1A08] whitespace-nowrap">{student.name}</td>
                         {visibleCourses.map((course) => {
-                          const score = student.course_scores[course.id] ?? 0
+                          const score = student.course_scores[course.id]
                           return (
                             <td key={course.id} className="px-4 py-2">
-                              <div className={`rounded-lg px-5 py-3 text-center font-semibold tabular-nums ${scoreTone(score)}`}>
-                                {score.toFixed(2)}
+                              <div className={`rounded-lg px-5 py-3 text-center font-semibold tabular-nums ${typeof score === 'number' ? scoreTone(score) : 'bg-[#F7F2EA] text-[#A89078]'}`}>
+                                {typeof score === 'number' ? score.toFixed(2) : '-'}
                               </div>
                             </td>
                           )
@@ -319,7 +319,7 @@ export default function CognitiveDashboardPage() {
                         <div className="min-w-0">
                           <h3 className="font-heading text-xl font-bold text-[#2C1A08] truncate">{student.name}</h3>
                           <p className="text-sm text-[#5C3D1A] truncate">
-                            {student.email || 'No email'} {student.phone ? `• ${student.phone}` : ''}
+                            {student.email || 'No email'} {student.phone ? ` - WA: ${student.phone}` : ' - WA belum tersedia'}
                           </p>
                         </div>
                       </div>
@@ -379,7 +379,7 @@ export default function CognitiveDashboardPage() {
               <div className="mb-6 text-sm">
                 <span className="font-semibold text-[#5C3D1A] mr-2">To:</span>
                 <span className="inline-flex rounded-lg bg-[#FDE8D8] px-3 py-2 font-bold text-[#2C1A08]">
-                  {draft.student.name} {draft.student.phone ? `(${draft.student.phone})` : '(no WhatsApp number)'}
+                  {draft.student.name} {draft.student.phone ? `(WA: ${draft.student.phone})` : '(WA belum tersedia)'}
                 </span>
               </div>
 

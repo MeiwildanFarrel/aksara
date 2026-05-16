@@ -122,6 +122,7 @@ export default function ManageQuizPage({ params }: { params: { id: string } }) {
         const questCounts: Record<string, number> = {}
         if (questsData) {
           questsData.forEach(q => {
+            if (!q.node_id) return
             questCounts[q.node_id] = (questCounts[q.node_id] || 0) + 1
           })
         }
@@ -151,6 +152,7 @@ export default function ManageQuizPage({ params }: { params: { id: string } }) {
 
           if (attemptsData && attemptsData.length > 0) {
             const userAttempts = attemptsData.reduce((acc: any, curr) => {
+              if (!curr.user_id) return acc
               if (!acc[curr.user_id]) acc[curr.user_id] = { correct: 0, total: 0, time: curr.attempted_at }
               acc[curr.user_id].total += 1
               if (curr.is_correct) acc[curr.user_id].correct += 1
@@ -251,19 +253,19 @@ export default function ManageQuizPage({ params }: { params: { id: string } }) {
               onClick={() => router.push('/dashboard/instructor')}
               className="flex items-center gap-3 w-full hover:bg-[#F3D580]/30 text-[#8B6340] rounded-xl px-4 py-3 font-medium transition-all">
               <Home size={18} />
-              Home
+              DASHBOARD
             </button>
             <button 
               onClick={() => router.push('/dashboard/instructor/courses')}
               className="flex items-center gap-3 w-full hover:bg-[#F3D580]/30 text-[#8B6340] rounded-xl px-4 py-3 font-medium transition-all">
               <BookOpen size={18} />
-              Add Courses
+              COURSES
             </button>
             <button 
               onClick={() => router.push('/dashboard/instructor/analytics')}
               className="flex items-center gap-3 w-full bg-[#F3D580] text-[#5C3D1A] rounded-xl px-4 py-3 font-semibold transition-all">
               <BarChart2 size={18} />
-              Analytics
+              ANALYTICS
             </button>
             <button 
               onClick={() => router.push('/dashboard/instructor/cognitive')}

@@ -160,14 +160,6 @@ export default function InstructorDashboard() {
       {/* Sidebar — fixed drawer on mobile, static on desktop */}
       <aside className={`fixed md:static left-0 top-0 h-full z-40 md:z-auto w-[280px] bg-[#FFF8EE] border-r border-[#F0E5D5] flex flex-col justify-between transition-transform duration-300 md:translate-x-0 ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}>
         <div className="p-8">
-          {/* AKSARA Logo */}
-          <Link href="/dashboard/instructor" className="flex items-center gap-2.5 mb-8 group">
-            <div className="relative w-8 h-8 shrink-0">
-              <Image src={wmIcon} alt="AKSARA logo" fill className="object-contain" />
-            </div>
-            <span className="font-heading text-[17px] font-bold text-[#2C1A08] tracking-wide group-hover:text-[#C8922A] transition-colors">AKSARA</span>
-          </Link>
-
           <div className="flex flex-col items-center mb-10">
             <div className="relative w-20 h-20 rounded-full overflow-hidden border-2 border-transparent ring-2 ring-[#C8922A]/20 bg-[#FAF3EC] mb-4 flex items-center justify-center text-2xl font-bold text-[#8B6340]">
               {user?.avatar_url ? (

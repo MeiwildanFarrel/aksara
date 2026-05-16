@@ -82,17 +82,18 @@ export default function AnalyticsReportPage({ params }: { params: { id: string }
           const avgScore = scores.length > 0
             ? scores.reduce((sum, score) => sum + score, 0) / scores.length
             : 0
-          const mmr = Math.round(1500 + avgScore * 1400)
-          let tier = 'Bronze Scholar'
-          if (mmr >= 2800) tier = 'Platinum Scholar'
-          else if (mmr >= 2400) tier = 'Gold Scholar'
-          else if (mmr >= 1800) tier = 'Silver Scholar'
+          const mmr = Math.max(0, Math.round(avgScore * 2900))
+          let computedTier = 'Bronze Scholar'
+          if (mmr >= 2800) computedTier = 'Diamond Scholar'
+          else if (mmr >= 2400) computedTier = 'Platinum Scholar'
+          else if (mmr >= 1800) computedTier = 'Gold Scholar'
+          else if (mmr >= 1500) computedTier = 'Silver Scholar'
 
           return {
             id: student.user_id,
-            name: student.email?.split('@')[0] || `Student ${student.user_id.slice(0, 4)}`,
-            nim: student.user_id.slice(0, 8).toUpperCase(),
-            tier,
+            name: student.name || student.email?.split('@')[0] || `Student ${student.user_id.slice(0, 4)}`,
+            nim: student.nim || '-',
+            tier: student.tier || computedTier,
             mmr,
             badges: avgScore >= 0.8 ? ['Mastery Pro'] : avgScore >= 0.5 ? ['Progressing'] : [],
           }
@@ -158,13 +159,13 @@ export default function AnalyticsReportPage({ params }: { params: { id: string }
 
           <nav className="flex flex-col gap-2">
             <button onClick={() => router.push('/dashboard/instructor')} className="flex items-center gap-3 w-full hover:bg-[#F3D580]/30 text-[#8B6340] rounded-xl px-4 py-3 font-medium transition-all">
-              <Home size={18} /> Home
+              <Home size={18} /> DASHBOARD
             </button>
             <button onClick={() => router.push('/dashboard/instructor/courses')} className="flex items-center gap-3 w-full hover:bg-[#F3D580]/30 text-[#8B6340] rounded-xl px-4 py-3 font-medium transition-all">
-              <BookOpen size={18} /> Add Courses
+              <BookOpen size={18} /> COURSES
             </button>
             <button onClick={() => router.push('/dashboard/instructor/analytics')} className="flex items-center gap-3 w-full bg-[#F3D580] text-[#5C3D1A] rounded-xl px-4 py-3 font-semibold transition-all">
-              <BarChart2 size={18} /> Analytics
+              <BarChart2 size={18} /> ANALYTICS
             </button>
             <button onClick={() => router.push('/dashboard/instructor/cognitive')} className="flex items-center gap-3 w-full hover:bg-[#F3D580]/30 text-[#8B6340] rounded-xl px-4 py-3 font-medium transition-all">
               <BrainCircuit size={18} /> COGNITIVE
