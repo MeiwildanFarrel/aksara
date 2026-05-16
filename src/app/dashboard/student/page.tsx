@@ -10,13 +10,11 @@ export default function StudentDashboard() {
   const [user, setUser] = useState<any | null>(null)
   const [isCheckingSession, setIsCheckingSession] = useState(true)
   const [joinedSessions, setJoinedSessions] = useState<any[]>([])
-
-  // Modal states
-  const [isModalOpen, setIsModalOpen] = useState(false)
-  const [pin, setPin] = useState(['', '', '', '', '', ''])
-  const [pinError, setPinError] = useState<string | null>(null)
-  const [isPinLoading, setIsPinLoading] = useState(false)
-  const inputRefs = useRef<(HTMLInputElement | null)[]>([])
+  
+  const [mmrData, setMmrData] = useState({ 
+    mmr: 1500, tier: 'Silver', next: { label: 'Gold', target: 1800 }, 
+    progressToNext: 0, winRate: 0, difficultyClimb: 1, streak: 0, totalQuiz: 0 
+  })
 
   useEffect(() => {
     async function checkUser() {
@@ -26,8 +24,9 @@ export default function StudentDashboard() {
     }
     checkUser()
     
-    async function loadSessions() {
+    async function loadSessionsAndStats() {
       const saved = localStorage.getItem('student_sessions')
+      let sessionsList = []
       if (saved) {
         const parsed = JSON.parse(saved)
         if (parsed.length > 0) {
@@ -41,68 +40,52 @@ export default function StudentDashboard() {
             
           if (activeSessions) {
             const activeIds = new Set(activeSessions.map((s: any) => s.id))
-            setJoinedSessions(parsed.filter((s: any) => activeIds.has(s.id)))
+            sessionsList = parsed.filter((s: any) => activeIds.has(s.id))
+            setJoinedSessions(sessionsList)
           } else {
             setJoinedSessions([])
           }
-        } else {
-          setJoinedSessions([])
         }
       }
+      
+      // Calculate MMR and stats
+      const supabase = createClient()
+      const { data: auth } = await supabase.auth.getUser()
+      if (auth.user) {
+        const { data: scores } = await supabase.from('mastery_scores').select('score').eq('user_id', auth.user.id)
+        let avg = 0
+        let winRate = 68 // default
+        if (scores && scores.length > 0) {
+           avg = scores.reduce((sum: number, s: any) => sum + (s.score || 0), 0) / scores.length
+           winRate = Math.round((scores.filter((s: any) => s.score >= 0.85).length / scores.length) * 100) || 0
+        }
+        const mmr = Math.round(1500 + avg * 1400)
+        
+        let tier = 'Bronze'
+        let next = { label: 'Silver', target: 1800 }
+        let division = 'NOVICE SCHOLAR'
+        if (mmr >= 2800) { tier = 'Diamond'; next = { label: 'Max Rank', target: 2900 }; division = 'MASTER SCHOLAR' }
+        else if (mmr >= 2400) { tier = 'Platinum'; next = { label: 'Diamond', target: 2800 }; division = 'ELITE SCHOLAR' }
+        else if (mmr >= 1800) { tier = 'Gold'; next = { label: 'Platinum', target: 2400 }; division = 'ADEPT SCHOLAR' }
+        else if (mmr >= 1500) { tier = 'Silver'; next = { label: 'Gold', target: 1800 }; division = 'APPRENTICE SCHOLAR' }
+        
+        const progressToNext = next.target <= mmr ? 100 : Math.min(100, Math.round(((mmr - (next.target - 400)) / 400) * 100))
+        
+        const { count } = await supabase.from('quest_attempts').select('*', { count: 'exact', head: true }).eq('user_id', auth.user.id)
+        
+        // Mock streak data from Insights API logic
+        const streakData = 14
+        
+        setMmrData({ 
+          mmr, tier, next, progressToNext: Math.max(0, progressToNext), 
+          winRate, difficultyClimb: Math.round(1 + avg * 9), 
+          streak: streakData, totalQuiz: count || 0,
+          division
+        } as any)
+      }
     }
-    loadSessions()
+    loadSessionsAndStats()
   }, [])
-
-  // PIN handlers
-  const handlePinChange = (index: number, value: string) => {
-    const upperVal = value.toUpperCase()
-    if (!/^[\d\w]*$/.test(upperVal)) return
-    const newPin = [...pin]
-    newPin[index] = upperVal
-    setPin(newPin)
-    setPinError(null)
-    if (upperVal !== '' && index < 5) inputRefs.current[index + 1]?.focus()
-  }
-
-  const handleKeyDown = (index: number, e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === 'Backspace' && pin[index] === '' && index > 0) inputRefs.current[index - 1]?.focus()
-  }
-
-  const handlePaste = (e: React.ClipboardEvent) => {
-    e.preventDefault()
-    const pastedData = e.clipboardData.getData('text').slice(0, 6).replace(/\D/g, '')
-    if (pastedData) {
-      const newPin = [...pin]
-      for (let i = 0; i < pastedData.length; i++) newPin[i] = pastedData[i]
-      setPin(newPin)
-      inputRefs.current[Math.min(pastedData.length, 5)]?.focus()
-    }
-  }
-
-  const handleJoinSession = async () => {
-    const fullPin = pin.join('')
-    if (fullPin.length < 6) { setPinError('PIN harus 6 digit.'); return }
-    try {
-      setIsPinLoading(true)
-      const res = await fetch(`/api/session/${fullPin}`)
-      if (res.ok) {
-        const sessionData = await res.json()
-        const existing = JSON.parse(localStorage.getItem('student_sessions') || '[]')
-        if (!existing.find((s: any) => s.id === sessionData.id)) {
-          sessionData.pin = fullPin
-          existing.push(sessionData)
-          localStorage.setItem('student_sessions', JSON.stringify(existing))
-        }
-        setIsModalOpen(false)
-        setPin(['', '', '', '', '', ''])
-        router.push('/dashboard/student/sessions')
-      } else {
-        const data = await res.json()
-        setPinError(data.error || 'Gagal menemukan sesi.')
-      }
-    } catch { setPinError('Terjadi kesalahan jaringan.') }
-    finally { setIsPinLoading(false) }
-  }
 
   if (isCheckingSession) {
     return (
@@ -115,198 +98,175 @@ export default function StudentDashboard() {
     )
   }
 
+  const { mmr, tier, next, progressToNext, winRate, difficultyClimb, streak, totalQuiz, division } = mmrData as any
+
   return (
-    <div className="min-h-screen bg-[#FBF7F0] flex flex-col">
+    <div className="min-h-screen bg-[#FFF9F2] flex flex-col">
 
-      <StudentNav active="dashboard" user={user} />
+      <StudentNav active="dashboard" user={user ? { ...user, tier } : user} />
 
-      {/* Main Content */}
-      <main className="flex-1 w-full flex flex-col items-center justify-center p-6 md:p-10">
+      <main className="flex-1 w-full flex flex-col items-center p-6 md:p-10">
 
-        {/* Greeting */}
-        <div className="text-center mb-10">
-          <h1 className="font-heading text-[36px] md:text-[42px] font-bold text-[#2C1A08] mb-2">
-            Selamat Datang, <span className="text-[#C8922A]">{user?.full_name || user?.email?.split('@')[0] || 'Pelajar'}</span>
+        <div className="mb-10 w-full max-w-[1100px] text-left">
+          <h1 className="font-heading text-[38px] md:text-[46px] font-bold text-[#A27B2B] mb-2 leading-tight">
+            Welcome back, <span className="text-[#322312]">{user?.full_name?.split(' ')[0] || user?.email?.split('@')[0] || 'Scholar'}.</span>
           </h1>
-          <p className="font-sans text-[15px] text-[#5C3D1A]">Mulai perjalanan intelektual Anda hari ini.</p>
+          <p className="font-sans text-[16px] text-[#867B6D]">Your cognitive development is flourishing. {next.label} rank awaits its next evolution.</p>
         </div>
 
-        {/* Two-Card Grid */}
-        <div className="grid md:grid-cols-2 gap-8 w-full max-w-[900px]">
-
-          {/* Card 1: Tambah Topik Baru */}
-          <div className="bg-[#261705] rounded-3xl p-10 border border-[#3E2610] shadow-lg flex flex-col items-center justify-center text-center relative overflow-hidden min-h-[380px] group cursor-pointer hover:border-[#C8922A]/40 transition-all duration-300" onClick={() => setIsModalOpen(true)}>
-            {/* Decorative bg */}
-            <div className="absolute -right-8 -top-8 opacity-[0.06]">
-              <svg className="w-56 h-56 text-[#C8922A]" fill="currentColor" viewBox="0 0 24 24"><path d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" /></svg>
-            </div>
-            <div className="relative z-10 w-full flex flex-col items-center">
-              <div className="mb-5 text-[#EAB308]">
-                <svg className="w-14 h-14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 w-full max-w-[1100px]">
+          
+          {/* Cognitive MMR Card */}
+          <div className="lg:col-span-2 bg-white rounded-3xl border border-[#F0EAE1] shadow-[0_4px_20px_rgba(0,0,0,0.02)] p-8 flex flex-col md:flex-row gap-8">
+            <div className="flex-1 border-b md:border-b-0 md:border-r border-[#F0EAE1] pb-6 md:pb-0 md:pr-8">
+              <span className="inline-flex items-center gap-1.5 bg-[#F9E298] text-[#845A17] px-3 py-1 rounded-full text-[12px] font-bold font-sans mb-5">
+                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 001.946-.806 3.42 3.42 0 014.438 0 3.42 3.42 0 001.946.806 3.42 3.42 0 013.138 3.138 3.42 3.42 0 00.806 1.946 3.42 3.42 0 010 4.438 3.42 3.42 0 00-.806 1.946 3.42 3.42 0 01-3.138 3.138 3.42 3.42 0 00-1.946.806 3.42 3.42 0 01-4.438 0 3.42 3.42 0 00-1.946-.806 3.42 3.42 0 01-3.138-3.138 3.42 3.42 0 00-.806-1.946 3.42 3.42 0 010-4.438 3.42 3.42 0 00.806-1.946 3.42 3.42 0 013.138-3.138z" />
                 </svg>
-              </div>
-              <h2 className="font-heading text-[28px] font-bold text-[#EAB308] leading-tight mb-3">Tambah Topik Baru?</h2>
-              <p className="font-sans text-[15px] text-[#A69C8E] mb-8 leading-relaxed px-4">
-                Temukan ratusan materi dan quest yang dikurasi oleh pakar akademis terbaik.
-              </p>
-              <button className="w-full max-w-[280px] bg-[#EAB308] hover:bg-[#D9A006] text-[#261705] py-3.5 rounded-3xl font-sans font-bold transition-colors shadow-sm text-sm group-hover:scale-[1.02] transition-transform duration-200">
-                Tambah PIN Code Baru
-              </button>
-            </div>
-          </div>
-
-          {/* Card 2: Daily Quiz */}
-          <div className="bg-white rounded-3xl p-10 border border-[#EDE4D3] shadow-[0_2px_20px_rgb(44,26,8,0.06)] flex flex-col relative overflow-hidden min-h-[380px] group">
-            {/* Top badge */}
-            <div className="flex items-center justify-between mb-6">
-              <span className="bg-[#FFF3E0] text-[#E67E22] px-3 py-1 rounded-full text-[11px] font-bold font-sans flex items-center gap-1.5">
-                <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M12.395 2.553a1 1 0 00-1.45-.385c-.345.23-.614.558-.822.88-.214.33-.403.713-.57 1.116-.334.804-.614 1.768-.84 2.734a31.365 31.365 0 00-.613 3.58 2.64 2.64 0 01-.945-1.067c-.328-.68-.398-1.534-.398-2.654A1 1 0 005.05 6.05 6.981 6.981 0 003 11a7 7 0 1011.95-4.95c-.592-.591-.98-.985-1.348-1.467-.363-.476-.724-1.063-1.207-2.03zM12.12 15.12A3 3 0 017 13s.879.5 2.5.5c0-1 .5-4 1.25-4.5.5 1 .786 1.293 1.371 1.879A2.99 2.99 0 0113 13a2.99 2.99 0 01-.879 2.121z" clipRule="evenodd" /></svg>
-                Daily Challenge
+                Cognitive MMR
               </span>
-              <div className="flex items-center gap-1">
-                <span className="text-[11px] font-bold font-sans text-[#C8922A] uppercase tracking-wide">3-Strike Lifelines</span>
+              <h2 className="font-heading text-[32px] font-bold text-[#20150A] leading-none mb-1">{tier} Tier</h2>
+              <p className="font-sans text-[11px] font-bold tracking-widest text-[#9A8F82] uppercase mb-10">{division} DIVISION</p>
+              
+              <div className="flex items-end gap-3 mb-4">
+                <span className="font-heading text-[54px] font-bold text-[#865F1D] leading-none">{mmr.toLocaleString('en-US')}</span>
+                <span className="font-sans text-[13px] font-bold text-[#5BB47A] mb-1.5">+45 Today</span>
               </div>
-            </div>
-
-            {/* Hearts */}
-            <div className="flex items-center gap-1 mb-6 self-end">
-              <svg className="w-5 h-5 text-[#C0392B]" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M3.172 5.172a4 4 0 015.656 0L10 6.343l1.172-1.171a4 4 0 115.656 5.656L10 17.657l-6.828-6.829a4 4 0 010-5.656z" clipRule="evenodd" /></svg>
-              <svg className="w-5 h-5 text-[#EDE4D3]" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M3.172 5.172a4 4 0 015.656 0L10 6.343l1.172-1.171a4 4 0 115.656 5.656L10 17.657l-6.828-6.829a4 4 0 010-5.656z" clipRule="evenodd" /></svg>
-              <svg className="w-5 h-5 text-[#EDE4D3]" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M3.172 5.172a4 4 0 015.656 0L10 6.343l1.172-1.171a4 4 0 115.656 5.656L10 17.657l-6.828-6.829a4 4 0 010-5.656z" clipRule="evenodd" /></svg>
-            </div>
-
-            {/* Mini quiz preview */}
-            <div className="bg-[#FDFBF7] rounded-2xl p-5 border border-[#EDE4D3] mb-6 flex-1">
-              <div className="flex items-center gap-2 mb-4">
-                <span className="bg-[#C8922A] text-white text-[10px] font-bold px-2.5 py-1 rounded-full font-sans">Variant Question A-1</span>
-                <div className="ml-auto flex gap-2">
-                  <span className="text-[11px] text-[#C8922A] font-sans font-semibold flex items-center gap-1">
-                    <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" /></svg>
-                    Hint
-                  </span>
-                </div>
+              
+              <div className="w-full bg-[#F2ECE4] h-[6px] rounded-full overflow-hidden mb-2">
+                <div className="bg-[#865F1D] h-full rounded-full" style={{ width: `${progressToNext}%` }}></div>
               </div>
-              <p className="font-sans text-[13px] text-[#2C1A08] leading-relaxed mb-4">Berdasarkan materi mengenai sistem drainase Candi Borobudur, mengapa restorasi 1973 memprioritaskan...</p>
-              <div className="space-y-2">
-                <div className="flex items-center gap-2.5 bg-white border border-[#EDE4D3] rounded-xl px-3 py-2.5">
-                  <div className="w-4 h-4 rounded-full border-2 border-[#EDE4D3] flex-shrink-0"></div>
-                  <span className="font-sans text-[11px] text-[#5C3D1A]">Untuk ritual purifikasi keagamaan...</span>
-                </div>
-                <div className="flex items-center gap-2.5 bg-[#FAE8B0]/30 border border-[#C8922A]/30 rounded-xl px-3 py-2.5">
-                  <div className="w-4 h-4 rounded-full border-2 border-[#C8922A] flex-shrink-0 flex items-center justify-center">
-                    <div className="w-2 h-2 rounded-full bg-[#C8922A]"></div>
+              <p className="font-sans text-[12px] text-[#867B6D] text-right">{next.target - mmr > 0 ? `${next.target - mmr} MMR to ${next.label}` : 'Max Rank Reached'}</p>
+            </div>
+            
+            <div className="flex-1 flex flex-col justify-between py-2 gap-4">
+              {[
+                { label: 'Win Rate', value: `${winRate}%`, progress: winRate },
+                { label: 'Difficulty Climb', value: `Level ${difficultyClimb}`, progress: difficultyClimb * 10 },
+                { label: 'Streak Consistency', value: `${streak} Days`, progress: Math.min(100, streak * 5) },
+                { label: 'Peer Help Quality', value: 'Top 5%', progress: 95 }
+              ].map((stat, idx) => (
+                <div key={idx} className="w-full">
+                  <div className="flex justify-between items-end mb-2">
+                    <span className="font-sans text-[13px] font-semibold text-[#5B4E41]">{stat.label}</span>
+                    <span className="font-sans text-[13px] font-bold text-[#865F1D]">{stat.value}</span>
                   </div>
-                  <span className="font-sans text-[11px] text-[#2C1A08] font-semibold">Untuk mengurangi tekanan hidrostatik...</span>
+                  <div className="w-full bg-[#F6F1EA] h-[5px] rounded-full overflow-hidden">
+                    <div className="bg-[#C8A265] h-full rounded-full" style={{ width: `${stat.progress}%` }}></div>
+                  </div>
                 </div>
-              </div>
-            </div>
-
-            {/* Progress bar */}
-            <div className="mb-4">
-              <div className="flex justify-between items-center mb-1.5">
-                <span className="text-[10px] font-bold font-sans text-[#8B6340] uppercase tracking-wide">Current Node Persistence</span>
-                <span className="text-[12px] font-bold font-sans text-[#C8922A]">62% Correctness</span>
-              </div>
-              <div className="w-full bg-[#EDE4D3] h-2 rounded-full overflow-hidden">
-                <div className="bg-gradient-to-r from-[#8B6340] to-[#C8922A] h-full rounded-full" style={{ width: '62%' }}></div>
-              </div>
-            </div>
-
-            {/* CTA */}
-            <button
-              onClick={() => {
-                const saved = localStorage.getItem('student_sessions')
-                if (saved) {
-                  const sessions = JSON.parse(saved)
-                  if (sessions.length > 0) {
-                    const firstSession = sessions[0]
-                    router.push(`/session/${firstSession.pin}`)
-                    return
-                  }
-                }
-                setIsModalOpen(true)
-              }}
-              className="w-full bg-[#C8922A] hover:bg-[#A67520] text-white py-3 rounded-xl font-sans font-semibold transition-colors flex items-center justify-center gap-2 text-[14px]"
-            >
-              Mulai Daily Quiz
-              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
-                <path strokeLinecap="round" strokeLinejoin="round" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
-            </button>
-          </div>
-
-        </div>
-
-        {/* Quick access to sessions */}
-        {joinedSessions.length > 0 && (
-          <div className="mt-10 w-full max-w-[900px]">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="font-heading text-[18px] font-bold text-[#2C1A08]">Sesi Terakhir</h3>
-              <a href="/dashboard/student/sessions" className="text-[13px] font-sans font-semibold text-[#C8922A] hover:text-[#A67520] transition-colors">Lihat Semua →</a>
-            </div>
-            <div className="flex gap-3 overflow-x-auto pb-2">
-              {joinedSessions.slice(0, 4).map((s: any) => (
-                <button key={s.id} onClick={() => router.push(`/session/${s.pin}`)} className="flex-shrink-0 bg-white border border-[#EDE4D3] rounded-xl px-5 py-3 font-sans text-[13px] text-[#2C1A08] font-semibold hover:border-[#C8922A] transition-colors shadow-sm">
-                  {s.title}
-                </button>
               ))}
             </div>
           </div>
-        )}
-      </main>
 
-      {/* Modal PIN Input */}
-      {isModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#FBF7F0]/90 backdrop-blur-sm p-4">
-          <div className="bg-white rounded-[32px] p-10 max-w-md w-full shadow-2xl border border-[#EDE4D3] text-center flex flex-col items-center">
-
-            <div className="w-14 h-14 rounded-full bg-[#FAE8B0]/40 flex items-center justify-center mb-6 text-[#A67520]">
-              <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
-              </svg>
-            </div>
-
-            <h2 className="font-heading text-[28px] font-bold text-[#2C1A08] mb-3">Tambah Topik Baru</h2>
-            <p className="font-sans text-[13px] text-[#5C3D1A] mb-8 leading-relaxed max-w-[280px]">
-              Silakan masukkan 6 digit kode PIN yang Anda terima untuk membuka akses.
-            </p>
-
-            <div className="flex justify-center gap-2.5 mb-2" onPaste={handlePaste}>
-              {pin.map((digit, idx) => {
-                const isError = pinError !== null
-                const base = "w-11 h-12 md:w-12 md:h-14 text-center text-xl font-heading rounded-lg outline-none transition-all duration-200"
-                const style = isError
-                  ? "bg-[#FDEDEC] border border-[#C0392B] text-[#C0392B] focus:border-[#C0392B] focus:ring-1 focus:ring-[#C0392B]"
-                  : "bg-[#FDFBF7] border border-[#E5DAC6] text-[#2C1A08] focus:border-[#4285F4] focus:ring-1 focus:ring-[#4285F4]"
+          {/* Tier Progression */}
+          <div className="bg-[#382818] rounded-3xl p-8 flex flex-col border border-[#4A3724] shadow-lg">
+            <h3 className="font-heading text-[22px] font-bold text-[#F8F3EC] mb-6">Tier Progression</h3>
+            <div className="flex-1 flex flex-col justify-between relative">
+              {/* Connecting line */}
+              <div className="absolute left-[20px] top-4 bottom-4 w-[2px] bg-[#4E3B27] z-0"></div>
+              
+              {['Diamond', 'Platinum', 'Gold', 'Silver', 'Bronze'].map((t) => {
+                const isActive = t === tier
                 return (
-                  <input key={idx} ref={el => { inputRefs.current[idx] = el }} type="text" maxLength={1} value={digit}
-                    onChange={(e) => handlePinChange(idx, e.target.value)} onKeyDown={(e) => handleKeyDown(idx, e)}
-                    className={`${base} ${style}`} autoFocus={idx === 0} />
+                  <div key={t} className="flex items-center gap-4 relative z-10 my-2">
+                    <div className={`w-10 h-10 rounded-full flex items-center justify-center transition-all ${isActive ? 'bg-[#F2D078] border-[3px] border-[#382818] shadow-[0_0_0_2px_#F2D078]' : 'bg-[#4E3B27]'}`}>
+                      {t === 'Diamond' && <svg className={`w-4 h-4 ${isActive ? 'text-[#845A17]' : 'text-[#8C7A67]'}`} fill="currentColor" viewBox="0 0 20 20"><path d="M10 2l6 5-6 11L4 7l6-5z" /></svg>}
+                      {t === 'Platinum' && <svg className={`w-4 h-4 ${isActive ? 'text-[#845A17]' : 'text-[#8C7A67]'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z" /></svg>}
+                      {t === 'Gold' && <svg className={`w-4 h-4 ${isActive ? 'text-[#845A17]' : 'text-[#8C7A67]'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}><path strokeLinecap="round" strokeLinejoin="round" d="M5 15l7-7 7 7" /></svg>}
+                      {t === 'Silver' && <svg className={`w-4 h-4 ${isActive ? 'text-[#845A17]' : 'text-[#8C7A67]'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M5 15l7-7 7 7" /></svg>}
+                      {t === 'Bronze' && <div className={`w-2.5 h-2.5 rotate-45 ${isActive ? 'bg-[#845A17]' : 'border-[2px] border-[#8C7A67]'}`}></div>}
+                    </div>
+                    <span className={`font-sans text-[14px] font-semibold ${isActive ? 'text-[#F2D078]' : 'text-[#8C7A67]'}`}>{t}</span>
+                  </div>
                 )
               })}
             </div>
+          </div>
 
-            <div className={`h-5 mb-6 flex items-center justify-center transition-opacity ${pinError ? 'opacity-100' : 'opacity-0'}`}>
-              <p className="font-sans text-[12px] font-semibold text-[#C0392B]">{pinError}</p>
+          {/* Daily Quest Card */}
+          <div className="bg-[#FAEFE2] rounded-3xl p-7 border border-[#EFDECD] shadow-sm flex flex-col relative overflow-hidden">
+            <div className="absolute top-6 right-6 bg-[#A1EDBB] text-[#1E5D36] px-3 py-1 rounded-full text-[11px] font-bold font-sans">
+              +250 XP
+            </div>
+            <h3 className="font-heading text-[22px] font-bold text-[#20150A] mb-1">Daily Quest</h3>
+            <p className="font-sans text-[13px] text-[#71604F] mb-6">Applied Cognitive Psychology MCQ</p>
+            
+            <div className="flex justify-between items-end mb-2">
+              <span className="font-sans text-[12px] font-bold text-[#6D5226]">Progress: 3 / 5 Solved</span>
+              <span className="font-sans text-[11px] text-[#93806C]">Next reward: 15 MMR</span>
+            </div>
+            
+            <div className="w-full bg-[#E5D5C1] h-2.5 rounded-full overflow-hidden mb-6 relative">
+              <div className="bg-[#1A8B49] h-full" style={{ width: '60%' }}></div>
+              <div className="absolute top-1/2 -translate-y-1/2 w-3.5 h-3.5 bg-white border-2 border-[#1A8B49] rounded-full shadow-sm" style={{ left: 'calc(60% - 7px)' }}></div>
             </div>
 
-            <button onClick={handleJoinSession} disabled={isPinLoading || pin.join('').length !== 6}
-              className="w-full bg-[#C8922A] hover:bg-[#A67520] text-white py-3 rounded-xl font-sans font-semibold transition-colors disabled:opacity-50 text-[14px]">
-              {isPinLoading ? 'Mengecek...' : 'Konfirmasi'}
-            </button>
+            <div className="flex gap-2 mb-8">
+              {[1, 2, 3, 4, 5].map((q) => (
+                <div key={q} className={`flex-1 aspect-[5/4] rounded-lg border flex items-center justify-center font-sans text-[13px] font-bold transition-colors ${q <= 3 ? 'bg-white border-[#1A8B49] text-[#1A8B49]' : 'bg-white border-[#E8DCCB] text-[#93806C]'}`}>
+                  {q <= 3 ? <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg> : q}
+                </div>
+              ))}
+            </div>
 
-            <button onClick={() => { setIsModalOpen(false); setPin(['', '', '', '', '', '']); setPinError(null) }}
-              className="mt-6 font-sans text-[12px] font-semibold text-[#5C3D1A] hover:text-[#2C1A08] transition-colors flex items-center gap-1.5">
-              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
-              </svg>
-              Batal dan Kembali ke Pustaka
+            <button onClick={() => router.push('/dashboard/student/sessions')} className="mt-auto w-full bg-[#825C17] hover:bg-[#684911] text-white py-3.5 rounded-[14px] font-sans font-bold transition-colors shadow-md text-[14px]">
+              Continue Session
             </button>
           </div>
+
+          {/* Stats Grid & Scholar Badge Wrapper */}
+          <div className="lg:col-span-2 flex flex-col gap-6">
+            
+            {/* Stats Grid */}
+            <div className="grid grid-cols-2 gap-6 flex-1">
+              <div className="bg-white rounded-3xl border border-[#F0EAE1] p-6 flex flex-col items-center justify-center text-center shadow-sm">
+                <div className="w-16 h-16 bg-[#FDE2A6] rounded-full flex items-center justify-center text-[#2C1A08] mb-4">
+                  <svg className="w-7 h-7" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                  </svg>
+                </div>
+                <h4 className="font-sans text-[16px] font-bold text-[#20150A] mb-1">Total Quiz</h4>
+                <p className="font-sans text-[13px] text-[#9A8F82]">{totalQuiz} Quiz Solved</p>
+              </div>
+              
+              <div className="bg-white rounded-3xl border border-[#F0EAE1] p-6 flex flex-col items-center justify-center text-center shadow-sm">
+                <div className="w-16 h-16 bg-[#A1EDBB] rounded-full flex items-center justify-center text-[#2C1A08] mb-4">
+                  <svg className="w-8 h-8" fill="currentColor" viewBox="0 0 24 24">
+                    <path d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5c-1.66 0-3 1.34-3 3s1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5C6.34 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z" />
+                  </svg>
+                </div>
+                <h4 className="font-sans text-[16px] font-bold text-[#20150A] mb-1">Banyak Courses</h4>
+                <p className="font-sans text-[13px] text-[#9A8F82]">lebih dari {joinedSessions.length} course diakses</p>
+              </div>
+            </div>
+
+            {/* Scholar Badge */}
+            <div className="bg-[#24170A] rounded-3xl p-8 border border-[#3E2A18] shadow-lg flex flex-col justify-center relative overflow-hidden group cursor-pointer hover:border-[#6D4C2B] transition-colors flex-1 min-h-[180px]">
+              {/* Background watermark */}
+              <svg className="absolute -right-6 -bottom-6 w-48 h-48 text-[#FFFFFF] opacity-[0.03] rotate-12 transition-transform group-hover:rotate-45 duration-700" fill="currentColor" viewBox="0 0 24 24">
+                <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
+              </svg>
+              
+              <div className="relative z-10">
+                <h3 className="font-heading text-[26px] font-bold text-[#F8F3EC] mb-3">Aksara Scholar Badge</h3>
+                <p className="font-sans text-[15px] text-[#A6998A] leading-relaxed mb-6">
+                  You've reached the top 5% of active researchers this month. Your analytical approach to cognitive tasks is exceptional.
+                </p>
+                <button className="font-sans text-[14px] font-bold text-[#EAB308] hover:text-[#FFD15C] flex items-center gap-2 transition-colors">
+                  View all achievements
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M17 8l4 4m0 0l-4 4m4-4H3" />
+                  </svg>
+                </button>
+              </div>
+            </div>
+
+          </div>
+
         </div>
-      )}
+
+      </main>
     </div>
   )
 }
