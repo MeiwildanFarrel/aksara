@@ -290,6 +290,15 @@ export default function StudentSessions() {
                       <path strokeLinecap="round" strokeLinejoin="round" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                     </svg>
                   </button>
+                  <button
+                    onClick={() => router.push(`/dashboard/student/skill-tree/${session.id}`)}
+                    className="w-full mt-2 border border-[#C8922A] text-[#C8922A] hover:bg-[#C8922A]/10 py-2.5 rounded-xl font-sans font-semibold text-sm transition-colors flex items-center justify-center gap-1.5"
+                  >
+                    Buka Skill Tree
+                    <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3" />
+                    </svg>
+                  </button>
                 </div>
               </div>
             )

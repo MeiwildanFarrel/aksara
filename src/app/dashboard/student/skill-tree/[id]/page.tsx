@@ -103,17 +103,19 @@ function statusForNode(
 }
 
 function tierFromMmr(mmr: number) {
-  if (mmr >= 2800) return 'Platinum Scholar'
-  if (mmr >= 2400) return 'Gold Scholar'
-  if (mmr >= 1800) return 'Silver Scholar'
+  if (mmr >= 5000) return 'Diamond Scholar'
+  if (mmr >= 3500) return 'Platinum Scholar'
+  if (mmr >= 2000) return 'Gold Scholar'
+  if (mmr >= 1000) return 'Silver Scholar'
   return 'Bronze Scholar'
 }
 
 function nextTier(mmr: number) {
-  if (mmr < 1800) return { label: 'Silver Scholar', target: 1800 }
-  if (mmr < 2400) return { label: 'Gold Scholar', target: 2400 }
-  if (mmr < 2800) return { label: 'Platinum Scholar', target: 2800 }
-  return { label: 'Max Rank', target: 2900 }
+  if (mmr < 1000) return { label: 'Silver Scholar', target: 1000, currentMin: 0 }
+  if (mmr < 2000) return { label: 'Gold Scholar', target: 2000, currentMin: 1000 }
+  if (mmr < 3500) return { label: 'Platinum Scholar', target: 3500, currentMin: 2000 }
+  if (mmr < 5000) return { label: 'Diamond Scholar', target: 5000, currentMin: 3500 }
+  return { label: 'Max Rank', target: 5000, currentMin: 5000 }
 }
 
 function statusTone(status: NodeStatus) {
@@ -241,14 +243,17 @@ function StudentSkillTreePage({ sessionId }: { sessionId: string }) {
     [sortedNodes, scores],
   )
 
-  // MMR & tier
-  const averageMastery = nodes.length > 0
-    ? Math.round(nodes.reduce((sum, n) => sum + ((scores[n.id] ?? 0) * 100), 0) / nodes.length)
+  // MMR & tier — computed from ALL user mastery scores (global, not per-session)
+  const allScoreValues = Object.values(scores)
+  const globalAvg = allScoreValues.length > 0
+    ? allScoreValues.reduce((sum, s) => sum + s, 0) / allScoreValues.length
     : 0
-  const mmr = Math.round(1500 + (averageMastery / 100) * 1400)
+  const mmr = Math.max(0, Math.round(globalAvg * 5000))
   const tier = tierFromMmr(mmr)
   const next = nextTier(mmr)
-  const progressToNext = next.target <= mmr ? 100 : Math.min(100, Math.round((mmr / next.target) * 100))
+  const progressToNext = next.label === 'Max Rank'
+    ? 100
+    : Math.min(100, Math.round((mmr - next.currentMin) / (next.target - next.currentMin) * 100))
 
   useEffect(() => {
     if (!user || !tier) return
@@ -355,7 +360,7 @@ function StudentSkillTreePage({ sessionId }: { sessionId: string }) {
               </div>
               <div className="mt-2 flex justify-between text-xs text-[#5C3D1A]">
                 <span>{mmr.toLocaleString('id-ID')} MMR</span>
-                <span>{next.label === 'Max Rank' ? 'Max tier reached' : `${next.target.toLocaleString('id-ID')} MMR to ${next.label}`}</span>
+                <span>{next.label === 'Max Rank' ? 'Max tier reached' : `${(next.target - mmr).toLocaleString('id-ID')} MMR to ${next.label}`}</span>
               </div>
             </div>
           </div>

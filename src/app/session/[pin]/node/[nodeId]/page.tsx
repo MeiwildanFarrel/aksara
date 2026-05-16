@@ -40,11 +40,11 @@ export default function QuestPage({ params }: { params: { pin: string, nodeId: s
   const [currentIndex, setCurrentIndex] = useState(0)
   
   // Store answers: { [questIndex]: { selectedIndex, result, aelMode, aiInsight } }
-  const [answers, setAnswers] = useState<Record<number, { 
-    selectedIndex: number, 
+  const [answers, setAnswers] = useState<Record<number, {
+    selectedIndex: number,
     result: SubmitResponse,
     aelMode: string,
-    aiInsight: string | null
+    aiInsight: string | null | false  // false = idle (not yet requested), null = loading, string = content
   }>>({})
   
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -148,7 +148,7 @@ export default function QuestPage({ params }: { params: { pin: string, nodeId: s
           selectedIndex: idx,
           result: data,
           aelMode: 'standard',
-          aiInsight: data.feedback
+          aiInsight: false
         }
       }))
       setPendingSelection(null)
@@ -366,41 +366,57 @@ export default function QuestPage({ params }: { params: { pin: string, nodeId: s
              <div className="mb-6 text-center text-[#D67B7B] font-sans text-sm">{error}</div>
           )}
 
-          {/* AI Insight */}
-          {currentAnswer && (
+          {/* AI Insight — hanya muncul jika jawaban salah */}
+          {currentAnswer && !currentAnswer.result.is_correct && (
             <div className="bg-[#FBE9B6] rounded-2xl p-6 mb-10 animate-fade-in">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-4">
-                <div className="flex items-center gap-2 font-sans font-bold text-[#8B6340]">
-                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
-                  </svg>
-                  AI Insight
+              {currentAnswer.aiInsight === false ? (
+                <div className="text-center py-1">
+                  <button
+                    onClick={() => handleAelQuery('standard')}
+                    className="inline-flex items-center gap-2 bg-[#8B6340] hover:bg-[#6B4A28] text-white px-5 py-2.5 rounded-xl font-sans font-bold text-sm transition-colors"
+                  >
+                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
+                    </svg>
+                    Minta Penjelasan AI
+                  </button>
                 </div>
-                <div className="flex gap-2">
-                  {['eli5', 'standard', 'teknikal'].map(mode => (
-                    <button 
-                      key={mode}
-                      onClick={() => handleAelQuery(mode)}
-                      className={`rounded-full px-4 py-1 text-[11px] font-bold capitalize transition-colors
-                        ${currentAnswer.aelMode === mode 
-                          ? 'bg-[#8B6340] text-white border border-[#8B6340]' 
-                          : 'bg-transparent text-[#8B6340] border border-[#D9B76A] hover:bg-[#F5D783]'}`}
-                    >
-                      {mode === 'eli5' ? 'ELI5' : mode}
-                    </button>
-                  ))}
-                </div>
-              </div>
-              <div className="font-sans text-[14px] text-[#5C3D1A] leading-relaxed">
-                {currentAnswer.aiInsight ? (
-                  <ReactMarkdown>{currentAnswer.aiInsight}</ReactMarkdown>
-                ) : (
-                  <div className="flex items-center gap-2 animate-pulse text-[#C8922A]">
-                    <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin"></div>
-                    Menyusun insight...
+              ) : (
+                <>
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-4">
+                    <div className="flex items-center gap-2 font-sans font-bold text-[#8B6340]">
+                      <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
+                      </svg>
+                      AI Insight
+                    </div>
+                    <div className="flex gap-2">
+                      {(['eli5', 'standard', 'teknikal'] as const).map(mode => (
+                        <button
+                          key={mode}
+                          onClick={() => handleAelQuery(mode)}
+                          className={`rounded-full px-4 py-1 text-[11px] font-bold capitalize transition-colors
+                            ${currentAnswer.aelMode === mode
+                              ? 'bg-[#8B6340] text-white border border-[#8B6340]'
+                              : 'bg-transparent text-[#8B6340] border border-[#D9B76A] hover:bg-[#F5D783]'}`}
+                        >
+                          {mode === 'eli5' ? 'ELI5' : mode}
+                        </button>
+                      ))}
+                    </div>
                   </div>
-                )}
-              </div>
+                  <div className="font-sans text-[14px] text-[#5C3D1A] leading-relaxed">
+                    {currentAnswer.aiInsight === null ? (
+                      <div className="flex items-center gap-2 animate-pulse text-[#C8922A]">
+                        <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin"></div>
+                        Menyusun insight...
+                      </div>
+                    ) : (
+                      <ReactMarkdown>{currentAnswer.aiInsight}</ReactMarkdown>
+                    )}
+                  </div>
+                </>
+              )}
             </div>
           )}
 
