@@ -273,7 +273,7 @@ export default function StudentNav({ active = 'dashboard', user: providedUser }:
   )
 
   return (
-    <div className="sticky top-0 z-50">
+    <div className="sticky top-0 z-50 w-full">
       <header className="relative w-full bg-[#2C1A08] px-4 md:px-8 py-4 flex items-center justify-end overflow-visible shadow-md">
 
       {/* Logo kiri */}
@@ -362,7 +362,7 @@ export default function StudentNav({ active = 'dashboard', user: providedUser }:
           )}
         </button>
 
-        <div className="relative flex items-center hidden md:flex" ref={profileRef}>
+        <div className="relative items-center hidden md:flex" ref={profileRef}>
           <button
             onClick={() => setIsProfileOpen((value) => !value)}
             className="relative w-[34px] h-[34px] rounded-full overflow-hidden border border-[#5C3D1A] bg-[#8B6340] flex items-center justify-center text-white font-sans text-[11px] font-bold hover:border-[#C8922A] transition-colors"

@@ -167,7 +167,7 @@ export default function CoursesSkillTreePage() {
                     {course.status}
                   </span>
                   <span className="text-[12px] font-semibold text-[#5C3D1A]">
-                    {course.totalNodes === 0 ? 'N/A' : `${course.progress}/100`}
+                    {course.totalNodes === 0 ? 'N/A' : `${course.progress}%`}
                   </span>
                 </div>
 

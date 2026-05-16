@@ -360,7 +360,7 @@ export default function AnalyticsReportPage({ params }: { params: { id: string }
           <div className="max-w-5xl mx-auto flex flex-col md:flex-row justify-between items-center gap-4">
             <div>
               <div className="font-heading font-bold text-[#2C1A08] mb-1">AKSARA</div>
-              <div className="text-xs text-[#8B6340]">© 2024 Aksara Learning Platform. Preserving Heritage, Empowering Future.</div>
+              <div className="text-xs text-[#8B6340]">© 2026 Aksara Learning Platform. Preserving Heritage, Empowering Future.</div>
             </div>
             <div className="flex gap-6 text-xs text-[#8B6340] font-medium">
               <a href="#" className="hover:text-[#C8922A] transition-colors">Privacy Policy</a>

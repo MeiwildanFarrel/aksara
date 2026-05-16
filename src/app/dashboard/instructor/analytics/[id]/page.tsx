@@ -135,8 +135,8 @@ export default function ManageQuizPage({ params }: { params: { id: string } }) {
             ...node,
             title: override.title || node.title,
             questionsCount: questCounts[node.id] || 0,
-            timer: override.timer || `${Math.floor(Math.random() * 30) + 15} Mins`,
-            status: override.status || (i === 0 ? 'Active' : i === 1 ? 'Draft' : 'Review Required')
+            timer: override.timer || '30 Mins',
+            status: override.status || 'Active'
           }
         })
         setQuizzes(enrichedQuizzes)
@@ -164,8 +164,8 @@ export default function ManageQuizPage({ params }: { params: { id: string } }) {
               const mockDuration = `${Math.floor(Math.random() * 5) + 10}m ${Math.floor(Math.random() * 60)}s`
               return {
                 id: uid,
-                name: `Student ${uid.substring(0, 4)}`,
-                initials: uid.substring(0, 2).toUpperCase(),
+                name: `Mahasiswa ${i + 1}`,
+                initials: `M${i + 1}`,
                 quizName: enrichedQuizzes[0]?.title || 'Quiz',
                 score: Math.round((u.correct / u.total) * 100),
                 time: new Date(u.time).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}),
@@ -455,7 +455,7 @@ export default function ManageQuizPage({ params }: { params: { id: string } }) {
                   
                   {recentSubmissions.length > 0 && (
                     <div className="p-4 border-t border-[#E8DCCB]">
-                      <button className="w-full text-center text-sm font-bold text-[#2C1A08] hover:text-[#C8922A] transition-colors">
+                      <button className="hidden w-full text-center text-sm font-bold text-[#2C1A08] hover:text-[#C8922A] transition-colors">
                         View All Submissions
                       </button>
                     </div>
@@ -561,7 +561,7 @@ export default function ManageQuizPage({ params }: { params: { id: string } }) {
           <div className="max-w-6xl mx-auto flex flex-col md:flex-row justify-between items-center gap-4">
             <div>
               <div className="font-heading font-bold text-[#2C1A08] mb-1">AKSARA</div>
-              <div className="text-xs text-[#8B6340]">© 2024 Aksara Learning Platform. Preserving Heritage, Empowering Future.</div>
+              <div className="text-xs text-[#8B6340]">© 2026 Aksara Learning Platform. Preserving Heritage, Empowering Future.</div>
             </div>
             <div className="flex gap-6 text-xs text-[#8B6340] font-medium">
               <a href="#" className="hover:text-[#C8922A] transition-colors">Privacy Policy</a>

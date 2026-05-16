@@ -165,13 +165,16 @@ export default function QuestPage({ params }: { params: { pin: string, nodeId: s
   async function handleAelQuery(mode: string) {
     const currentAns = answers[currentIndex]
     if (!currentAns) return
-    
+
     // Optimistic update mode
     setAnswers(prev => ({
       ...prev,
       [currentIndex]: { ...prev[currentIndex], aelMode: mode, aiInsight: null }
     }))
-    
+
+    const controller = new AbortController()
+    const timeout = setTimeout(() => controller.abort(), 8000)
+
     try {
       const res = await fetch('/api/ael/query', {
         method: 'POST',
@@ -180,7 +183,8 @@ export default function QuestPage({ params }: { params: { pin: string, nodeId: s
           query: quests[currentIndex].question,
           session_id: sessionId,
           mode
-        })
+        }),
+        signal: controller.signal
       })
 
       if (res.ok) {
@@ -189,9 +193,16 @@ export default function QuestPage({ params }: { params: { pin: string, nodeId: s
           ...prev,
           [currentIndex]: { ...prev[currentIndex], aiInsight: data.answer }
         }))
+      } else {
+        throw new Error('AEL error')
       }
-    } catch (e) {
-      // Revert or show error
+    } catch {
+      setAnswers(prev => ({
+        ...prev,
+        [currentIndex]: { ...prev[currentIndex], aiInsight: "Maaf, insight sedang tidak tersedia. Coba lanjut ke soal berikutnya." }
+      }))
+    } finally {
+      clearTimeout(timeout)
     }
   }
 
@@ -395,12 +406,7 @@ export default function QuestPage({ params }: { params: { pin: string, nodeId: s
 
           {/* Footer Actions */}
           <div className="flex justify-between items-center pt-6 mt-6 border-t border-[#F0EBE1]">
-            <button className="flex items-center gap-2 text-[#8B6340] hover:text-[#2C1A08] font-sans text-xs font-semibold transition-colors">
-              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 21v-4m0 0V5a2 2 0 012-2h6.5l1 1H21l-3 6 3 6h-8.5l-1-1H5a2 2 0 00-2 2zm9-13.5V9" />
-              </svg>
-              Report Issue
-            </button>
+            <div />
             <div className="flex gap-3">
               <button 
                 onClick={() => setCurrentIndex(prev => Math.max(0, prev - 1))}

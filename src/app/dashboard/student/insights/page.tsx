@@ -402,7 +402,7 @@ export default function InsightsPage() {
       <footer className="w-full bg-[#2C1A08] mt-12 py-8 px-8 flex flex-col md:flex-row items-center justify-between gap-4">
         <div>
           <span className="font-heading text-[18px] font-bold text-[#C8922A]">AKSARA</span>
-          <p className="font-sans text-[11px] text-[#8B6340] mt-1">© 2024 AKSARA Learning. Empowering Indonesian Scholarship.</p>
+          <p className="font-sans text-[11px] text-[#8B6340] mt-1">© 2026 AKSARA Learning. Empowering Indonesian Scholarship.</p>
         </div>
         <div className="flex gap-6">
           <a href="#" className="font-sans text-[12px] text-[#8B6340] hover:text-[#C8922A] transition-colors">Privacy Policy</a>

@@ -173,7 +173,7 @@ export default function AnalyticsModulesPage() {
                 className="w-full pl-12 pr-4 py-3.5 bg-[#FAF3EC] border border-[#E8DCCB] rounded-xl text-[#2C1A08] placeholder-[#A89078] focus:outline-none focus:ring-2 focus:ring-[#C8922A]/50 focus:border-[#C8922A] transition-all font-medium"
               />
             </div>
-            <button className="flex items-center gap-2 px-6 py-3.5 bg-[#FDEEDB] text-[#8B6340] font-semibold rounded-xl border border-[#F3D580]/50 hover:bg-[#F3D580]/30 transition-colors">
+            <button className="hidden flex items-center gap-2 px-6 py-3.5 bg-[#FDEEDB] text-[#8B6340] font-semibold rounded-xl border border-[#F3D580]/50 hover:bg-[#F3D580]/30 transition-colors">
               <Filter size={18} /> Filter
             </button>
           </div>
@@ -215,11 +215,7 @@ export default function AnalyticsModulesPage() {
                   </h3>
                   
                   <p className="text-[#8B6340] text-sm leading-relaxed mb-6 line-clamp-3 flex-1">
-                    {index === 0 
-                      ? "Eksplorasi mendalam mengenai pemikiran rasionalisme dan empirisme di abad ke-17. Sesi ini..."
-                      : index === 1
-                      ? "Menganalisis implikasi moral dari algoritma kecerdasan buatan dalam pengambilan keputusan publik dan privasi data."
-                      : "Penelusuran evolusi tulisan Pallawa menjadi berbagai aksara daerah di Indonesia seperti Kawi, Jawa, dan..."}
+                    {`Sesi pembelajaran interaktif mengenai ${session.title}.`}
                   </p>
 
                   <div className={`rounded-xl p-4 mb-6 flex justify-between items-center ${type === 'ended' ? 'bg-[#F5EFE9]' : 'bg-[#FAF3EC]'}`}>
@@ -254,7 +250,7 @@ export default function AnalyticsModulesPage() {
           <div className="max-w-6xl mx-auto flex flex-col md:flex-row justify-between items-center gap-4">
             <div>
               <div className="font-heading font-bold text-[#2C1A08] mb-1">AKSARA</div>
-              <div className="text-xs text-[#8B6340]">© 2024 Aksara Learning Platform. Preserving Heritage, Empowering Future.</div>
+              <div className="text-xs text-[#8B6340]">© 2026 Aksara Learning Platform. Preserving Heritage, Empowering Future.</div>
             </div>
             <div className="flex gap-6 text-xs text-[#8B6340] font-medium">
               <a href="#" className="hover:text-[#C8922A] transition-colors">Privacy Policy</a>
