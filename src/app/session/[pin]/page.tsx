@@ -2,8 +2,15 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
+import useSWR from 'swr'
 import { createClient } from '../../../../lib/supabase/client'
 import StudentNav from '../../dashboard/student/components/StudentNav'
+
+const jsonFetcher = async (url: string) => {
+  const res = await fetch(url)
+  if (!res.ok) throw new Error('Gagal memuat data')
+  return res.json()
+}
 
 interface Session {
   id: string
@@ -37,61 +44,55 @@ interface MasteryMap {
 export default function SessionDetail({ params }: { params: { pin: string } }) {
   const router = useRouter()
   const { pin } = params
-  
-  const [session, setSession] = useState<Session | null>(null)
-  const [nodes, setNodes] = useState<SkillNode[]>([])
-  const [mastery, setMastery] = useState<MasteryMap>({})
+
   const [user, setUser] = useState<{ email: string } | null>(null)
-  const [isLoading, setIsLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
+  const [mastery, setMastery] = useState<MasteryMap>({})
+
+  // SWR caches by key — revisiting the same pin returns cached data instantly
+  const { data: session, error: sessionError, isLoading: isSessionLoading } = useSWR<Session>(
+    `/api/session/${pin}`,
+    jsonFetcher,
+    { revalidateOnFocus: false, dedupingInterval: 30_000 }
+  )
+  const { data: nodes = [], isLoading: isNodesLoading } = useSWR<SkillNode[]>(
+    `/api/session/${pin}/nodes`,
+    jsonFetcher,
+    { revalidateOnFocus: false, dedupingInterval: 30_000 }
+  )
+
+  const isLoading = isSessionLoading || isNodesLoading
+  const error = sessionError ? (sessionError as Error).message : null
 
   useEffect(() => {
-    async function loadData() {
+    let cancelled = false
+    async function loadAuxiliary() {
       try {
-        setIsLoading(true)
-        
-        // Fetch User
         const resUser = await fetch('/api/user/me')
-        if (resUser.ok) setUser(await resUser.json())
+        if (resUser.ok && !cancelled) setUser(await resUser.json())
 
-        // Fetch Session
-        const sessionRes = await fetch(`/api/session/${pin}`)
-        if (!sessionRes.ok) throw new Error('Sesi tidak valid')
-        const sessionData: Session = await sessionRes.json()
-        setSession(sessionData)
-
-        // Fetch Nodes & Mastery
         const supabase = createClient()
-        const { data: { user } } = await supabase.auth.getUser()
-        if (user) {
-          const [nodesRes, masteryRes] = await Promise.all([
-            fetch(`/api/session/${pin}/nodes`),
-            supabase
-              .from('mastery_scores')
-              .select('node_id, score')
-              .eq('user_id', user.id)
-          ])
+        const { data: { user: authUser } } = await supabase.auth.getUser()
+        if (!authUser || cancelled) return
 
-          if (nodesRes.ok) {
-            const fetchedNodes = (await nodesRes.json()) as SkillNode[]
-            setNodes(fetchedNodes)
-          }
-          
-          const m: MasteryMap = {}
-          if (masteryRes.data) {
-            masteryRes.data.forEach(item => {
-              if (item.node_id) m[item.node_id] = item.score ?? 0
-            })
-          }
-          setMastery(m)
+        const { data: masteryRows } = await supabase
+          .from('mastery_scores')
+          .select('node_id, score')
+          .eq('user_id', authUser.id)
+
+        if (cancelled) return
+        const m: MasteryMap = {}
+        if (masteryRows) {
+          masteryRows.forEach((item) => {
+            if (item.node_id) m[item.node_id] = item.score ?? 0
+          })
         }
-      } catch (err) {
-        setError(err instanceof Error ? err.message : 'Terjadi kesalahan')
-      } finally {
-        setIsLoading(false)
+        setMastery(m)
+      } catch {
+        // mastery is non-critical for first render
       }
     }
-    loadData()
+    loadAuxiliary()
+    return () => { cancelled = true }
   }, [pin])
 
   const isNodeUnlocked = (node: SkillNode, index: number) => {
@@ -118,8 +119,49 @@ export default function SessionDetail({ params }: { params: { pin: string } }) {
 
   if (isLoading) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-[#FBF7F0]">
-        <div className="h-16 w-16 animate-spin-slow rounded-full border-2 border-[#EDE4D3] border-t-[#C8922A]" />
+      <div className="min-h-screen bg-[#FBF7F0] text-[#2C1A08] font-sans pb-20">
+        <StudentNav active="sessions" user={user} />
+        <main className="mx-auto max-w-5xl px-6 py-12 flex flex-col items-center">
+          {/* Breadcrumb skeleton */}
+          <div className="h-3 w-48 rounded-full bg-[#EDE4D3] animate-pulse mb-8" />
+          {/* Title skeleton */}
+          <div className="flex flex-col items-center gap-3 mb-10 w-full max-w-3xl">
+            <div className="h-10 w-3/4 rounded-xl bg-[#EDE4D3] animate-pulse" />
+            <div className="h-10 w-2/3 rounded-xl bg-[#E6D9BF] animate-pulse" />
+          </div>
+          <div className="w-[60%] max-w-lg h-px bg-[#EDE4D3] mb-12 opacity-50" />
+          {/* Author skeleton */}
+          <div className="flex flex-col items-center mb-10 gap-3">
+            <div className="w-16 h-16 rounded-full bg-[#EDE4D3] animate-pulse" />
+            <div className="h-3 w-24 rounded-full bg-[#EDE4D3] animate-pulse" />
+            <div className="h-4 w-32 rounded-full bg-[#EDE4D3] animate-pulse" />
+          </div>
+          {/* Description skeleton */}
+          <div className="flex flex-col items-center gap-2 max-w-2xl w-full mb-20">
+            <div className="h-3 w-full rounded-full bg-[#EDE4D3] animate-pulse" />
+            <div className="h-3 w-5/6 rounded-full bg-[#EDE4D3] animate-pulse" />
+            <div className="h-3 w-2/3 rounded-full bg-[#EDE4D3] animate-pulse" />
+          </div>
+          {/* Quest grid skeleton — circular grey placeholders */}
+          <div className="w-full">
+            <div className="h-3 w-20 rounded-full bg-[#EDE4D3] animate-pulse mb-3" />
+            <div className="h-7 w-44 rounded-lg bg-[#EDE4D3] animate-pulse mb-8" />
+            <div className="grid md:grid-cols-3 gap-6">
+              {[0, 1, 2, 3, 4, 5].map((i) => (
+                <div key={i} className="bg-white rounded-3xl p-8 border border-[#EDE4D3] shadow-sm flex flex-col gap-4">
+                  <div className="w-12 h-12 rounded-full bg-[#EDE4D3] animate-pulse" />
+                  <div className="h-3 w-16 rounded-full bg-[#EDE4D3] animate-pulse" />
+                  <div className="h-5 w-3/4 rounded-lg bg-[#EDE4D3] animate-pulse" />
+                  <div className="h-3 w-full rounded-full bg-[#EDE4D3] animate-pulse" />
+                  <div className="h-3 w-2/3 rounded-full bg-[#EDE4D3] animate-pulse" />
+                  <div className="mt-auto pt-5 border-t border-[#EDE4D3]">
+                    <div className="h-3 w-1/2 rounded-full bg-[#EDE4D3] animate-pulse" />
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </main>
       </div>
     )
   }
@@ -238,12 +280,22 @@ export default function SessionDetail({ params }: { params: { pin: string } }) {
               const override = JSON.parse(localStorage.getItem('quizOverrides') || '{}')[node.id];
               const displayTimer = override?.timer || `${Math.floor(Math.random() * 30) + 15} Mins`;
               
+              const masteryPct = score !== null ? score : null
+              const badgeLabel = !unlocked ? null
+                : masteryPct === null ? 'Pelajari Dulu'
+                : masteryPct >= 80 ? 'Selesai ✓'
+                : 'Lanjutkan'
+              const badgeClass = !unlocked ? ''
+                : masteryPct === null ? 'bg-[#DBEAFE] text-[#1E40AF]'
+                : masteryPct >= 80 ? 'bg-[#D1FAE5] text-[#065F46]'
+                : 'bg-[#FDE2A6] text-[#7A5200]'
+
               return (
                 <div
                   key={node.id}
                   className={`bg-white rounded-3xl p-8 border border-[#EDE4D3] shadow-sm flex flex-col transition-shadow ${unlocked ? 'hover:shadow-md cursor-pointer' : 'opacity-60 cursor-not-allowed'}`}
                   onClick={() => {
-                    if (unlocked) router.push(`/session/${pin}/node/${node.id}`)
+                    if (unlocked) router.push(`/session/${pin}/node/${node.id}/learn`)
                   }}
                 >
                   <div className="w-12 h-12 rounded-full bg-[#FFE8D6] mb-6 flex items-center justify-center text-[#D35400]">
@@ -258,22 +310,16 @@ export default function SessionDetail({ params }: { params: { pin: string } }) {
                   </p>
                   <div className="mt-auto border-t border-[#EDE4D3] pt-5">
                     <span className="font-sans text-[13px] text-[#2C1A08] block mb-3">{node.quest_count ?? 0} Pertanyaan • {displayTimer}</span>
-                    {!unlocked && (
-                      <span className="bg-[#F5EFE9] text-[#8B6340] px-2 py-1 rounded text-[11px] font-bold inline-flex items-center gap-1.5 tracking-wide mb-3">
+                    {!unlocked ? (
+                      <span className="bg-[#F5EFE9] text-[#8B6340] px-2 py-1 rounded text-[11px] font-bold inline-flex items-center gap-1.5 tracking-wide">
                         TERKUNCI • Selesaikan quest sebelumnya
                       </span>
-                    )}
-                    {score !== null && (
-                      <div className="flex items-center gap-3">
-                        <span className="bg-[#E6F4EA] text-[#137333] px-2 py-1 rounded text-[11px] font-bold flex items-center gap-1.5 tracking-wide">
-                          <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
-                            <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-                          </svg>
-                          SELESAI
-                        </span>
-                        <span className="text-[#137333] font-bold text-[13px] font-sans">
-                          Nilai: {grade} ({score}/100)
-                        </span>
+                    ) : badgeLabel && (
+                      <div className="flex items-center justify-between">
+                        <span className={`px-3 py-1 rounded-full text-[11px] font-bold ${badgeClass}`}>{badgeLabel}</span>
+                        {score !== null && (
+                          <span className="text-[#137333] font-bold text-[12px] font-sans">{grade} ({score}/100)</span>
+                        )}
                       </div>
                     )}
                   </div>

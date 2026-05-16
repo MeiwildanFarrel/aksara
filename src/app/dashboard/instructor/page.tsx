@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import Image from 'next/image'
 import { createClient } from '../../../../lib/supabase/client'
@@ -13,6 +14,7 @@ import helpIcon from '../../public/help.png'
 import logoutIcon from '../../public/logout.png'
 import studentIcon from '../../public/student.png'
 import bookIcon from '../../public/book.png'
+import wmIcon from '../../public/wm_icon.png'
 
 interface Session {
   id: string
@@ -38,6 +40,7 @@ export default function InstructorDashboard() {
   const [sessions, setSessions] = useState<Session[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [isModalOpen, setIsModalOpen] = useState(false)
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false)
   const [newTitle, setNewTitle] = useState('')
   const [isCreating, setIsCreating] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -146,9 +149,25 @@ export default function InstructorDashboard() {
 
   return (
     <div className="flex h-screen bg-white text-[#2C1A08] font-sans overflow-hidden">
-      {/* Sidebar */}
-      <aside className="w-[280px] bg-[#FFF8EE] border-r border-[#F0E5D5] flex flex-col justify-between">
+      {/* Mobile backdrop */}
+      {isSidebarOpen && (
+        <div
+          className="fixed inset-0 bg-black/40 z-30 md:hidden"
+          onClick={() => setIsSidebarOpen(false)}
+        />
+      )}
+
+      {/* Sidebar — fixed drawer on mobile, static on desktop */}
+      <aside className={`fixed md:static left-0 top-0 h-full z-40 md:z-auto w-[280px] bg-[#FFF8EE] border-r border-[#F0E5D5] flex flex-col justify-between transition-transform duration-300 md:translate-x-0 ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}>
         <div className="p-8">
+          {/* AKSARA Logo */}
+          <Link href="/dashboard/instructor" className="flex items-center gap-2.5 mb-8 group">
+            <div className="relative w-8 h-8 shrink-0">
+              <Image src={wmIcon} alt="AKSARA logo" fill className="object-contain" />
+            </div>
+            <span className="font-heading text-[17px] font-bold text-[#2C1A08] tracking-wide group-hover:text-[#C8922A] transition-colors">AKSARA</span>
+          </Link>
+
           <div className="flex flex-col items-center mb-10">
             <div className="relative w-20 h-20 rounded-full overflow-hidden border-2 border-transparent ring-2 ring-[#C8922A]/20 bg-[#FAF3EC] mb-4 flex items-center justify-center text-2xl font-bold text-[#8B6340]">
               {user?.avatar_url ? (
@@ -162,41 +181,46 @@ export default function InstructorDashboard() {
           </div>
 
           <nav className="flex flex-col gap-2">
-            <button 
-              onClick={() => router.push('/dashboard/instructor')}
+            <Link
+              prefetch
+              href="/dashboard/instructor"
               className="flex items-center gap-3 w-full bg-[#F3D580] text-[#5C3D1A] rounded-xl px-4 py-3 font-semibold transition-all">
               <Home size={18} />
               DASHBOARD
-            </button>
-            <button 
-              onClick={() => router.push('/dashboard/instructor/courses')}
+            </Link>
+            <Link
+              prefetch
+              href="/dashboard/instructor/courses"
               className="flex items-center gap-3 w-full hover:bg-[#F3D580]/30 text-[#8B6340] rounded-xl px-4 py-3 font-medium transition-all">
               <BookOpen size={18} />
               COURSES
-            </button>
-            <button 
-              onClick={() => router.push('/dashboard/instructor/analytics')}
+            </Link>
+            <Link
+              prefetch
+              href="/dashboard/instructor/analytics"
               className="flex items-center gap-3 w-full hover:bg-[#F3D580]/30 text-[#8B6340] rounded-xl px-4 py-3 font-medium transition-all">
               <BarChart2 size={18} />
               ANALYTICS
-            </button>
-            <button 
-              onClick={() => router.push('/dashboard/instructor/cognitive')}
+            </Link>
+            <Link
+              prefetch
+              href="/dashboard/instructor/cognitive"
               className="flex items-center gap-3 w-full hover:bg-[#F3D580]/30 text-[#8B6340] rounded-xl px-4 py-3 font-medium transition-all">
               <BrainCircuit size={18} />
               COGNITIVE
-            </button>
+            </Link>
           </nav>
         </div>
 
         <div className="p-8 flex flex-col gap-2">
-          <button 
-            onClick={() => router.push('/dashboard/instructor/settings')}
+          <Link
+            prefetch
+            href="/dashboard/instructor/settings"
             className="flex items-center gap-3 w-full hover:bg-[#F3D580]/30 text-[#8B6340] rounded-xl px-4 py-3 font-medium transition-all"
           >
             <Settings size={18} />
             Setting Profile
-          </button>
+          </Link>
           <button onClick={handleSignOut} className="flex items-center gap-3 w-full hover:bg-[#F3D580]/30 text-[#C0392B] rounded-xl px-4 py-3 font-semibold transition-all">
             <LogOut size={18} />
             Logout
@@ -205,11 +229,30 @@ export default function InstructorDashboard() {
       </aside>
 
       {/* Main Content */}
-      <main className="flex-1 overflow-y-auto">
-        <div className="max-w-5xl mx-auto p-10">
-          
+      <main className="flex-1 overflow-y-auto min-w-0">
+        {/* Mobile top bar with hamburger */}
+        <div className="md:hidden flex items-center gap-3 px-4 py-3 border-b border-[#F0E5D5] sticky top-0 bg-white z-20">
+          <button
+            onClick={() => setIsSidebarOpen(true)}
+            className="p-2.5 rounded-lg text-[#5C3D1A] hover:bg-[#F5EFE9] transition-colors min-h-[44px] min-w-[44px] flex items-center justify-center"
+            aria-label="Buka menu"
+          >
+            <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 12h16M4 18h16" />
+            </svg>
+          </button>
+          <div className="flex items-center gap-2">
+            <div className="relative w-7 h-7">
+              <Image src={wmIcon} alt="AKSARA" fill className="object-contain" />
+            </div>
+            <span className="font-heading text-lg font-bold text-[#2C1A08]">AKSARA</span>
+          </div>
+        </div>
+
+        <div className="max-w-5xl mx-auto p-6 md:p-10">
+
           {/* Header */}
-          <div className="flex justify-between items-start mb-10">
+          <div className="flex flex-col md:flex-row justify-between items-start gap-4 mb-10">
             <div>
               <h1 className="font-heading text-3xl font-bold text-[#2C1A08] flex items-center gap-2">
                 Selamat datang, {user?.full_name ? user.full_name.split(' ').slice(0, 2).join(' ') : 'Dosen'} <span className="text-2xl">👋</span>
@@ -225,7 +268,7 @@ export default function InstructorDashboard() {
           </div>
 
           {/* Stats Cards */}
-          <div className="grid grid-cols-2 gap-6 mb-12">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 mb-12">
             <div className="bg-white rounded-2xl p-6 border border-[#F0E5D5] shadow-sm flex flex-col justify-between">
               <div className="flex items-center gap-4 mb-4">
                 <div className="w-10 h-10 rounded-full bg-[#FFF0D4] flex items-center justify-center">
@@ -263,7 +306,7 @@ export default function InstructorDashboard() {
           {/* Sesi Aktif */}
           <div>
             <h2 className="font-heading text-2xl font-bold text-[#2C1A08] mb-6">Sesi Aktif</h2>
-            <div className="grid grid-cols-2 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               {sessions.map((session) => {
                 const normalizedStatus = (session.status || 'Draft').toLowerCase();
                 const isLive = normalizedStatus === 'active';
@@ -302,18 +345,20 @@ export default function InstructorDashboard() {
                     </div>
 
                     <div className="flex gap-3">
-                      <button 
-                        onClick={() => router.push(`/dashboard/instructor/session/${session.id}`)}
-                        className="flex-1 bg-white border border-[#C8922A] text-[#C8922A] font-semibold py-2.5 rounded-lg hover:bg-[#C8922A] hover:text-white transition-colors"
+                      <Link
+                        prefetch
+                        href={`/dashboard/instructor/session/${session.id}`}
+                        className="flex-1 text-center bg-white border border-[#C8922A] text-[#C8922A] font-semibold py-2.5 rounded-lg hover:bg-[#C8922A] hover:text-white transition-colors"
                       >
                         Kelola
-                      </button>
-                      <button 
-                        onClick={() => router.push(`/dashboard/instructor/analytics/${session.id}/report`)}
-                        className="flex-1 bg-[#C8922A] border border-[#C8922A] text-white font-semibold py-2.5 rounded-lg hover:bg-[#A67520] transition-colors"
+                      </Link>
+                      <Link
+                        prefetch
+                        href={`/dashboard/instructor/analytics/${session.id}/report`}
+                        className="flex-1 text-center bg-[#C8922A] border border-[#C8922A] text-white font-semibold py-2.5 rounded-lg hover:bg-[#A67520] transition-colors"
                       >
                         Analytics
-                      </button>
+                      </Link>
                     </div>
                   </div>
                 )

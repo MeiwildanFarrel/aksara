@@ -52,7 +52,8 @@ export async function middleware(request: NextRequest) {
   }
 
   // Sudah login dan mencoba akses /login → redirect /onboarding
-  if (user && pathname === '/login') {
+  // Kecuali jika ada ?error= (misalnya dari auth callback yang gagal) — biarkan halaman login tampil
+  if (user && pathname === '/login' && !request.nextUrl.searchParams.has('error')) {
     const onboardingUrl = request.nextUrl.clone()
     onboardingUrl.pathname = '/onboarding'
     return NextResponse.redirect(onboardingUrl)

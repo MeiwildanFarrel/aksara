@@ -1,37 +1,59 @@
 import { createServerClient } from '@supabase/ssr'
 import { cookies } from 'next/headers'
-import { NextRequest, NextResponse } from 'next/server'
+import { NextResponse, type NextRequest } from 'next/server'
 import type { Database } from '../../../../types/supabase'
 
 export async function GET(request: NextRequest) {
-  const { searchParams, origin } = new URL(request.url)
+  const { searchParams, origin } = request.nextUrl
   const code = searchParams.get('code')
 
-  if (code) {
-    const cookieStore = await cookies()
-    const supabase = createServerClient<Database>(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-      {
-        cookies: {
-          getAll() {
-            return cookieStore.getAll()
-          },
-          setAll(cookiesToSet) {
-            cookiesToSet.forEach(({ name, value, options }) =>
-              cookieStore.set(name, value, options)
-            )
-          },
-        },
-      }
-    )
-
-    const { error } = await supabase.auth.exchangeCodeForSession(code)
-
-    if (!error) {
-      return NextResponse.redirect(`${origin}/onboarding`)
-    }
+  if (!code) {
+    return NextResponse.redirect(`${origin}/login?error=no_code`)
   }
 
-  return NextResponse.redirect(`${origin}/login?error=auth_callback_error`)
+  const cookieStore = await cookies()
+  const supabase = createServerClient<Database>(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    {
+      cookies: {
+        getAll() {
+          return cookieStore.getAll()
+        },
+        setAll(cookiesToSet) {
+          cookiesToSet.forEach(({ name, value, options }) =>
+            cookieStore.set(name, value, options)
+          )
+        },
+      },
+    }
+  )
+
+  let userId: string
+  try {
+    const { data, error } = await supabase.auth.exchangeCodeForSession(code)
+    if (error || !data.user) {
+      console.error('[auth/callback] exchangeCodeForSession failed:', error)
+      return NextResponse.redirect(`${origin}/login?error=auth_callback_error`)
+    }
+    userId = data.user.id
+  } catch (err) {
+    console.error('[auth/callback] unexpected error:', err)
+    return NextResponse.redirect(`${origin}/login?error=auth_callback_error`)
+  }
+
+  const { data: profile } = await supabase
+    .from('users')
+    .select('role')
+    .eq('id', userId)
+    .single()
+
+  const role = profile?.role
+  if (role === 'instructor') {
+    return NextResponse.redirect(`${origin}/dashboard/instructor`)
+  }
+  if (role === 'student') {
+    return NextResponse.redirect(`${origin}/dashboard/student`)
+  }
+  return NextResponse.redirect(`${origin}/onboarding`)
 }

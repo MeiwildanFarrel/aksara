@@ -5,6 +5,7 @@ import {
   generateSkillTree,
   generateQuestsForNode,
   generateVariants,
+  generateNodeSummary,
 } from '../../../../../lib/quest-generator'
 import type { Database } from '../../../../../types/supabase'
 
@@ -275,6 +276,33 @@ export async function POST(request: NextRequest) {
         variantsCreated = count ?? variantInserts.length
       }
     }
+
+    // 12. Parallel: generate summaries for all nodes and save to DB
+    //     Best-effort — errors here don't fail the overall response.
+    await Promise.all(
+      nodeRecords.map(async (node) => {
+        try {
+          const summary = await generateNodeSummary(node.title, node.relevantChunks)
+          // New columns added by migration — generated types don't include them yet
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const summaryPayload = { summary: summary.summary, key_points: summary.key_points, flash_cards: summary.flash_cards } as any
+          const { error: updateErr } = await serviceClient
+            .from('skill_nodes')
+            .update(summaryPayload)
+            .eq('id', node.id)
+          if (updateErr) {
+            console.error(
+              `[quest-gen] summary update failed for node "${node.title}": ${updateErr.message}`,
+            )
+          } else {
+            console.log(`[quest-gen] summary saved for node "${node.title}"`)
+          }
+        } catch (err) {
+          const msg = err instanceof Error ? err.message : String(err)
+          console.warn(`[quest-gen] generateNodeSummary failed for "${node.title}": ${msg}`)
+        }
+      }),
+    )
 
     console.log(
       `[quest-gen] Done: ${nodesCreated} nodes, ${questsCreated} quests, ${variantsCreated} variants`,

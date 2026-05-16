@@ -34,18 +34,26 @@ export async function generateText(prompt: string): Promise<string> {
     const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' })
     const result = await model.generateContent(prompt)
     return result.response.text()
-  } catch (err) {
-    const status = (err as { status?: number })?.status
-    if (status !== 429) throw err
-
-    // Fallback to Groq on rate limit
-    console.warn('[gemini] rate-limited (429), falling back to Groq')
-    const groq = new Groq({ apiKey: process.env.GROQ_API_KEY! })
-    const completion = await groq.chat.completions.create({
-      model: 'llama-3.3-70b-versatile',
-      messages: [{ role: 'user', content: prompt }],
-    })
-    return completion.choices[0]?.message?.content ?? ''
+  } catch {
+    // Fallback to Groq on any Gemini error
+    console.log('[gemini] fallback to Groq')
+    const groqRes = await fetch(
+      'https://api.groq.com/openai/v1/chat/completions',
+      {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${process.env.GROQ_API_KEY}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          model: 'llama-3.3-70b-versatile',
+          messages: [{ role: 'user', content: prompt }],
+          max_tokens: 1000
+        })
+      }
+    )
+    const groqData = await groqRes.json()
+    return groqData.choices[0].message.content
   }
 }
 

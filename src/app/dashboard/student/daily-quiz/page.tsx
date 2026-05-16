@@ -73,29 +73,24 @@ function DailyQuizInner() {
     async function loadData() {
       const res = await fetch('/api/user/me')
       if (res.ok) setUser(await res.json())
-      
+
       const saved = localStorage.getItem('student_sessions')
-      let initialTopic = 'Sains Kognitif'
-      if (saved) {
-        const parsed = JSON.parse(saved)
-        if (parsed.length > 0) {
-          const dayOfYear = Math.floor((new Date().getTime() - new Date().getTimezoneOffset() * 60000) / 86400000)
-          initialTopic = parsed[dayOfYear % parsed.length].title
-          setTopic(initialTopic)
-        }
+      const parsed = saved ? JSON.parse(saved) : []
+      if (!parsed || parsed.length === 0) {
+        // Daily Quiz hanya tersedia setelah student bergabung ke sesi
+        router.replace('/dashboard/student/sessions')
+        return
       }
+
+      const dayOfYear = Math.floor((new Date().getTime() - new Date().getTimezoneOffset() * 60000) / 86400000)
+      const initialTopic = parsed[dayOfYear % parsed.length].title
+      setTopic(initialTopic)
+      setActiveSessionId(parsed[0].id || '')
       setIsChecking(false)
       generateQuestions(initialTopic)
-
-      // Store active session_id for RAG
-      const savedSessions = localStorage.getItem('student_sessions')
-      if (savedSessions) {
-        const parsedSessions = JSON.parse(savedSessions)
-        if (parsedSessions.length > 0) setActiveSessionId(parsedSessions[0].id || '')
-      }
     }
     loadData()
-  }, [])
+  }, [router])
 
   // --- Review Mode: show finished results from localStorage ---
   if (isReviewMode) {

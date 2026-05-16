@@ -41,9 +41,7 @@ export default function LoginPage() {
               priority
             />
           </div>
-          <p className="font-sans text-[#8B6340] text-sm tracking-wide relative z-10">
-            Belajar &middot; Mengajar &middot; Mencerahkan
-          </p>
+       
         </div>
 
         {/* The White Card */}
@@ -71,10 +69,7 @@ export default function LoginPage() {
             Masuk dengan Google
           </button>
 
-          <div className="mt-10 flex flex-col items-center">
-            <span className="text-[13px] font-sans text-[#8B6340] mb-3">Butuh bantuan akses?</span>
-            <div className="w-10 h-[1.5px] bg-[#EDE4D3]"></div>
-          </div>
+      
         </div>
 
       </div>

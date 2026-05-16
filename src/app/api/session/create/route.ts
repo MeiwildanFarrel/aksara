@@ -8,30 +8,42 @@ function generatePin(): string {
     .padStart(6, '0')
 }
 
-/** Cari PIN yang belum dipakai di tabel sessions. */
-async function getUniquePin(
-  supabase: Awaited<ReturnType<typeof createClient>>
-): Promise<string> {
-  const MAX_ATTEMPTS = 10
+type SupabaseClient = Awaited<ReturnType<typeof createClient>>
+type SessionRow = { id: string; title: string; pin: string; created_at: string }
 
-  for (let i = 0; i < MAX_ATTEMPTS; i++) {
+/**
+ * Atomic PIN generation: langsung INSERT, retry hanya jika
+ * terjadi unique constraint violation (PostgreSQL error 23505).
+ * Tidak ada race condition antara SELECT dan INSERT.
+ */
+async function insertSessionWithUniquePin(
+  supabase: SupabaseClient,
+  instructorId: string,
+  title: string,
+  MAX_RETRIES = 5,
+): Promise<SessionRow> {
+  for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
     const pin = generatePin()
 
     const { data, error } = await supabase
       .from('sessions')
-      .select('id')
-      .eq('pin', pin)
-      .maybeSingle()
+      .insert({ instructor_id: instructorId, title, pin })
+      .select('id, title, pin, created_at')
+      .single()
 
-    if (error) {
-      throw new Error(`Gagal cek keunikan PIN: ${error.message}`)
+    if (!error && data) return data as SessionRow
+
+    // 23505 = unique_violation: PIN sudah dipakai → coba PIN baru
+    if ((error as unknown as { code?: string })?.code === '23505') {
+      console.warn(`[session/create] PIN ${pin} collision (attempt ${attempt + 1}), retrying...`)
+      continue
     }
 
-    // Tidak ada row yang ditemukan → PIN aman dipakai
-    if (!data) return pin
+    // Error lain → lempar langsung
+    throw new Error(error.message)
   }
 
-  throw new Error('Gagal generate PIN unik setelah 10 percobaan.')
+  throw new Error('Gagal generate PIN unik setelah 5 percobaan.')
 }
 
 export async function POST(request: NextRequest) {
@@ -59,25 +71,13 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // 3. Generate PIN unik
-    const pin = await getUniquePin(supabase)
-
-    // 4. INSERT sesi baru
-    const { data: session, error: insertError } = await supabase
-      .from('sessions')
-      .insert({
-        instructor_id: user.id,
-        title: title.trim(),
-        pin,
-      })
-      .select('id, title, pin, created_at')
-      .single()
-
-    if (insertError) {
-      return NextResponse.json(
-        { error: 'Gagal membuat sesi.', detail: insertError.message },
-        { status: 500 }
-      )
+    // 3. Insert sesi dengan PIN unik — atomic, tidak ada race condition
+    let session: SessionRow
+    try {
+      session = await insertSessionWithUniquePin(supabase, user.id, title.trim())
+    } catch (insertErr) {
+      const msg = insertErr instanceof Error ? insertErr.message : 'Gagal membuat sesi.'
+      return NextResponse.json({ error: msg }, { status: 500 })
     }
 
     return NextResponse.json(session, { status: 201 })

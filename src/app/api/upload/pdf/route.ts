@@ -89,34 +89,39 @@ export async function POST(request: NextRequest) {
       process.env.SUPABASE_SERVICE_ROLE_KEY!
     )
 
-    // 8. Embed + insert sequentially to stay within Gemini free-tier rate limits
+    // 8. Embed + insert in batches of 10 for ~10x speedup while respecting
+    //    Gemini free-tier rate limits (avoid sending all chunks at once).
+    const BATCH_SIZE = 10
     let insertedCount = 0
-    for (let i = 0; i < chunks.length; i++) {
-      const chunk = chunks[i]
+
+    async function embedAndInsert(chunk: string, index: number): Promise<void> {
       const estimatedPage = Math.max(
         1,
-        Math.ceil(((i + 1) / chunks.length) * numpages)
+        Math.ceil(((index + 1) / chunks.length) * numpages),
       )
-
       const embedding = await generateEmbedding(chunk)
-
       const { error: insertError } = await serviceClient
         .from('pdf_chunks')
         .insert({
           session_id: sessionId,
           content: chunk,
-          // pgvector expects the string format "[n1,n2,...]"
           embedding: `[${embedding.join(',')}]`,
           source_ref: `hal. ${estimatedPage}`,
         })
-
       if (insertError) {
-        console.error(`[upload/pdf] chunk ${i + 1} insert error: ${insertError.message}`)
+        console.error(`[upload/pdf] chunk ${index + 1} insert error: ${insertError.message}`)
       } else {
         insertedCount++
       }
+    }
 
-      console.log(`[upload/pdf] chunk ${i + 1}/${chunks.length} done`)
+    for (let i = 0; i < chunks.length; i += BATCH_SIZE) {
+      const batch = chunks.slice(i, i + BATCH_SIZE)
+      await Promise.all(batch.map((chunk, j) => embedAndInsert(chunk, i + j)))
+      console.log(
+        `[upload/pdf] batch ${Math.floor(i / BATCH_SIZE) + 1}/${Math.ceil(chunks.length / BATCH_SIZE)} done` +
+        ` (chunks ${i + 1}–${Math.min(i + BATCH_SIZE, chunks.length)}/${chunks.length})`,
+      )
     }
 
     if (chunks.length > 0 && insertedCount === 0) {

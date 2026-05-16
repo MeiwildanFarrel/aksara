@@ -78,8 +78,9 @@ export async function POST(request: NextRequest) {
         `mode=${mode} query="${query.slice(0, 60)}"`,
     )
 
-    // 3. Tier-1 cache: exact SHA-256 match
-    const queryHash = hashQuery(`${query}:${mode}`)
+    // 3. Tier-1 cache: exact SHA-256 match — keyed per session to prevent
+    //    Course A answers leaking into Course B (BUG-04 fix)
+    const queryHash = hashQuery(`${query}:${mode}:${sessionId}`)
     const exactHit = await checkExactCache(queryHash, mode)
     if (exactHit) {
       return NextResponse.json({

@@ -2,11 +2,13 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react'
 import Image from 'next/image'
+import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { Bell, CheckCircle2, Compass, LogOut, Medal, MessageSquareText, Trophy } from 'lucide-react'
 import { createClient } from '../../../../../lib/supabase/client'
 import notificationIcon from '../../../public/notification.png'
 import settingsIcon from '../../../public/settings.png'
+import wmIcon from '../../../public/wm_icon.png'
 
 type StudentUser = {
   id?: string
@@ -91,6 +93,7 @@ export default function StudentNav({ active = 'dashboard', user: providedUser }:
   const [readAt, setReadAt] = useState('')
   const [isProfileOpen, setIsProfileOpen] = useState(false)
   const [isNotificationOpen, setIsNotificationOpen] = useState(false)
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
   const profileRef = useRef<HTMLDivElement>(null)
   const notifRef = useRef<HTMLDivElement>(null)
 
@@ -258,13 +261,37 @@ export default function StudentNav({ active = 'dashboard', user: providedUser }:
     router.replace('/login')
   }
 
+  const mobileNavLink = (href: string, label: string, key: typeof active) => (
+    <Link
+      prefetch
+      href={href}
+      onClick={() => setIsMobileMenuOpen(false)}
+      className={`flex items-center px-4 py-3 rounded-xl font-sans text-[14px] font-semibold transition-colors ${active === key ? 'bg-[#C8922A] text-white' : 'text-[#C4A882] hover:bg-white/10 hover:text-white'}`}
+    >
+      {label}
+    </Link>
+  )
+
   return (
-    <header className="sticky top-0 w-full bg-[#2C1A08] px-4 md:px-8 py-4 flex items-center justify-end overflow-visible z-50 shadow-md">
+    <div className="sticky top-0 z-50">
+      <header className="relative w-full bg-[#2C1A08] px-4 md:px-8 py-4 flex items-center justify-end overflow-visible shadow-md">
+
+      {/* Logo kiri */}
+      <Link
+        href="/dashboard/student"
+        className="absolute left-4 md:left-8 flex items-center z-10 group"
+        aria-label="AKSARA — kembali ke dashboard"
+      >
+        <span className="font-heading text-[18px] font-bold text-white tracking-wide group-hover:text-[#C8922A] transition-colors">
+          AKSARA
+        </span>
+      </Link>
+
       <nav className="hidden md:flex absolute left-1/2 transform -translate-x-1/2 items-center gap-8 z-10">
-        <a href="/dashboard/student" className={`${active === 'dashboard' ? 'text-[#C8922A] font-semibold border-b-2 border-[#C8922A]' : 'text-[#C4A882] hover:text-white'} font-sans text-sm transition-colors pb-1`}>Dashboard</a>
-        <a href="/dashboard/student/sessions" className={`${active === 'sessions' ? 'text-[#C8922A] font-semibold border-b-2 border-[#C8922A]' : 'text-[#C4A882] hover:text-white'} font-sans text-sm transition-colors pb-1`}>Sessions</a>
-        <a href="/dashboard/student/skill-tree" className={`${active === 'skill-tree' ? 'text-[#C8922A] font-semibold border-b-2 border-[#C8922A]' : 'text-[#C4A882] hover:text-white'} font-sans text-sm transition-colors pb-1`}>Skill Tree</a>
-        <a href="/dashboard/student/insights" className={`${active === 'insights' ? 'text-[#C8922A] font-semibold border-b-2 border-[#C8922A]' : 'text-[#C4A882] hover:text-white'} font-sans text-sm transition-colors pb-1`}>Insights</a>
+        <Link prefetch href="/dashboard/student" className={`${active === 'dashboard' ? 'text-[#C8922A] font-semibold border-b-2 border-[#C8922A]' : 'text-[#C4A882] hover:text-white'} font-sans text-sm transition-colors pb-1`}>Dashboard</Link>
+        <Link prefetch href="/dashboard/student/sessions" className={`${active === 'sessions' ? 'text-[#C8922A] font-semibold border-b-2 border-[#C8922A]' : 'text-[#C4A882] hover:text-white'} font-sans text-sm transition-colors pb-1`}>Sessions</Link>
+        <Link prefetch href="/dashboard/student/skill-tree" className={`${active === 'skill-tree' ? 'text-[#C8922A] font-semibold border-b-2 border-[#C8922A]' : 'text-[#C4A882] hover:text-white'} font-sans text-sm transition-colors pb-1`}>Skill Tree</Link>
+        <Link prefetch href="/dashboard/student/insights" className={`${active === 'insights' ? 'text-[#C8922A] font-semibold border-b-2 border-[#C8922A]' : 'text-[#C4A882] hover:text-white'} font-sans text-sm transition-colors pb-1`}>Insights</Link>
       </nav>
 
       <div className="flex items-center gap-5 md:gap-7 z-10">
@@ -314,11 +341,28 @@ export default function StudentNav({ active = 'dashboard', user: providedUser }:
           )}
         </div>
 
-        <button onClick={() => router.push('/dashboard/student/settings')} className="relative w-[26px] h-[26px] opacity-90 hover:opacity-100 transition-opacity flex items-center justify-center" aria-label="Settings">
+        <button onClick={() => router.push('/dashboard/student/settings')} className="relative w-[26px] h-[26px] opacity-90 hover:opacity-100 transition-opacity items-center justify-center hidden md:flex" aria-label="Settings">
           <Image src={settingsIcon} alt="Settings" fill sizes="26px" className="object-contain" />
         </button>
 
-        <div className="relative flex items-center" ref={profileRef}>
+        {/* Hamburger — mobile only */}
+        <button
+          onClick={() => setIsMobileMenuOpen((v) => !v)}
+          className="md:hidden ml-2 p-2 rounded-lg text-white hover:bg-white/10 transition-colors min-h-[44px] min-w-[44px] flex items-center justify-center"
+          aria-label="Toggle navigation menu"
+        >
+          {isMobileMenuOpen ? (
+            <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          ) : (
+            <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 12h16M4 18h16" />
+            </svg>
+          )}
+        </button>
+
+        <div className="relative flex items-center hidden md:flex" ref={profileRef}>
           <button
             onClick={() => setIsProfileOpen((value) => !value)}
             className="relative w-[34px] h-[34px] rounded-full overflow-hidden border border-[#5C3D1A] bg-[#8B6340] flex items-center justify-center text-white font-sans text-[11px] font-bold hover:border-[#C8922A] transition-colors"
@@ -351,5 +395,34 @@ export default function StudentNav({ active = 'dashboard', user: providedUser }:
         </div>
       </div>
     </header>
+
+    {/* Mobile dropdown menu */}
+    {isMobileMenuOpen && (
+      <nav className="md:hidden bg-[#2C1A08] border-t border-[#3A2512] shadow-xl">
+        <div className="flex flex-col p-3 gap-1">
+          {mobileNavLink('/dashboard/student', 'Dashboard', 'dashboard')}
+          {mobileNavLink('/dashboard/student/sessions', 'Sessions', 'sessions')}
+          {mobileNavLink('/dashboard/student/skill-tree', 'Skill Tree', 'skill-tree')}
+          {mobileNavLink('/dashboard/student/insights', 'Insights', 'insights')}
+          <div className="border-t border-[#3A2512] mt-2 pt-2 flex flex-col gap-1">
+            <Link
+              href="/dashboard/student/settings"
+              onClick={() => setIsMobileMenuOpen(false)}
+              className="flex items-center px-4 py-3 rounded-xl font-sans text-[14px] font-semibold text-[#C4A882] hover:bg-white/10 hover:text-white transition-colors"
+            >
+              Pengaturan Profil
+            </Link>
+            <button
+              onClick={() => { setIsMobileMenuOpen(false); handleSignOut() }}
+              className="flex items-center gap-2 px-4 py-3 rounded-xl font-sans text-[14px] font-semibold text-[#FAD2D0] hover:bg-white/10 transition-colors w-full text-left"
+            >
+              <LogOut size={16} />
+              Log Out
+            </button>
+          </div>
+        </div>
+      </nav>
+    )}
+  </div>
   )
 }

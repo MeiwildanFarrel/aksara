@@ -220,11 +220,13 @@ export default function StudentSettingsPage() {
 
         <section className="mb-8 rounded-[22px] border border-[#E2D2C0] bg-white p-7 shadow-sm">
           <div className="flex flex-col gap-6 md:flex-row md:items-center">
-            <div className="relative h-28 w-28 shrink-0 overflow-hidden rounded-full border-4 border-[#D39A2B] bg-[#F8EAD9] text-3xl font-bold text-[#8B6340] shadow-sm flex items-center justify-center">
-              {avatarUrl ? <img src={avatarUrl} alt={fullName || 'Student profile'} className="h-full w-full object-cover" /> : initials(fullName || user?.email || 'ST')}
+            <div className="relative shrink-0">
+              <div className="h-28 w-28 overflow-hidden rounded-full border-4 border-[#D39A2B] bg-[#F8EAD9] text-3xl font-bold text-[#8B6340] shadow-sm flex items-center justify-center">
+                {avatarUrl ? <img src={avatarUrl} alt={fullName || 'Student profile'} className="h-full w-full object-cover" /> : initials(fullName || user?.email || 'ST')}
+              </div>
               <button
                 onClick={() => fileInputRef.current?.click()}
-                className="absolute bottom-0 right-0 h-9 w-9 rounded-full bg-[#D39A2B] text-white border-4 border-white flex items-center justify-center hover:bg-[#A67520]"
+                className="absolute -bottom-1 -right-1 h-10 w-10 rounded-full bg-[#D39A2B] text-white border-2 border-white shadow-md flex items-center justify-center hover:bg-[#A67520]"
                 aria-label="Change photo"
               >
                 <Camera size={16} />

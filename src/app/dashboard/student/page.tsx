@@ -11,12 +11,14 @@ export default function StudentDashboard() {
   const [isCheckingSession, setIsCheckingSession] = useState(true)
   const [joinedSessions, setJoinedSessions] = useState<any[]>([])
   
-  const [mmrData, setMmrData] = useState({ 
-    mmr: 1500, tier: 'Silver', next: { label: 'Gold', target: 1800 }, 
-    progressToNext: 0, winRate: 0, difficultyClimb: 1, streak: 0, totalQuiz: 0 
+  const [mmrData, setMmrData] = useState({
+    mmr: 0, tier: 'Bronze', next: { label: 'Silver', target: 1500 },
+    progressToNext: 0, winRate: 0, difficultyClimb: 0, streak: 0, totalQuiz: 0,
+    division: 'NOVICE SCHOLAR'
   })
-  const [dailyQuizTopic, setDailyQuizTopic] = useState('Cognitive Sciences')
-  const [dailyQuizResult, setDailyQuizResult] = useState<{ date: string; topic: string; results: boolean[]; mmrGained: number } | null>(null)
+  const [questTerakhir, setQuestTerakhir] = useState<{ topicTitle: string; results: boolean[]; nodeId: string } | null>(null)
+  const [resumeNode, setResumeNode] = useState<{ nodeId: string; nodeTitle: string; sessionPin: string; score: number } | null>(null)
+  const [pinInput, setPinInput] = useState('')
 
   useEffect(() => {
     async function checkUser() {
@@ -45,9 +47,7 @@ export default function StudentDashboard() {
             sessionsList = parsed.filter((s: any) => activeIds.has(s.id))
             setJoinedSessions(sessionsList)
             if (sessionsList.length > 0) {
-               // Use day of year to deterministically pick a "random" topic daily
-               const dayOfYear = Math.floor((new Date().getTime() - new Date().getTimezoneOffset() * 60000) / 86400000)
-               setDailyQuizTopic(sessionsList[dayOfYear % sessionsList.length].title)
+               // Sessions loaded — topics used elsewhere if needed
             }
           } else {
             setJoinedSessions([])
@@ -60,54 +60,128 @@ export default function StudentDashboard() {
       const { data: auth } = await supabase.auth.getUser()
       if (auth.user) {
         const { data: scores } = await supabase.from('mastery_scores').select('score').eq('user_id', auth.user.id)
+        const hasScores = !!scores && scores.length > 0
         let avg = 0
-        let winRate = 68 // default
-        if (scores && scores.length > 0) {
+        let winRate = 0
+        if (hasScores) {
            avg = scores.reduce((sum: number, s: any) => sum + (s.score || 0), 0) / scores.length
            winRate = Math.round((scores.filter((s: any) => s.score >= 0.85).length / scores.length) * 100) || 0
         }
-        const mmr = Math.round(1500 + avg * 1400)
-        
+        const mmr = hasScores ? Math.max(0, Math.round(avg * 2900)) : 0
+
         let tier = 'Bronze'
-        let next = { label: 'Silver', target: 1800 }
+        let next = { label: 'Silver', target: 1500 }
         let division = 'NOVICE SCHOLAR'
         if (mmr >= 2800) { tier = 'Diamond'; next = { label: 'Max Rank', target: 2900 }; division = 'MASTER SCHOLAR' }
         else if (mmr >= 2400) { tier = 'Platinum'; next = { label: 'Diamond', target: 2800 }; division = 'ELITE SCHOLAR' }
         else if (mmr >= 1800) { tier = 'Gold'; next = { label: 'Platinum', target: 2400 }; division = 'ADEPT SCHOLAR' }
         else if (mmr >= 1500) { tier = 'Silver'; next = { label: 'Gold', target: 1800 }; division = 'APPRENTICE SCHOLAR' }
-        
-        const progressToNext = next.target <= mmr ? 100 : Math.min(100, Math.round(((mmr - (next.target - 400)) / 400) * 100))
-        
-        const { count } = await supabase.from('quest_attempts').select('*', { count: 'exact', head: true }).eq('user_id', auth.user.id)
-        
-        // Mock streak data from Insights API logic
-        const streakData = 14
-        
-        setMmrData({ 
-          mmr, tier, next, progressToNext: Math.max(0, progressToNext), 
-          winRate, difficultyClimb: Math.round(1 + avg * 9), 
-          streak: streakData, totalQuiz: count || 0,
+
+        let progressToNext = 0
+        if (mmr >= 2800) progressToNext = 100
+        else if (tier === 'Bronze') progressToNext = Math.round((mmr / 1500) * 100)
+        else if (tier === 'Silver') progressToNext = Math.round(((mmr - 1500) / 300) * 100)
+        else if (tier === 'Gold') progressToNext = Math.round(((mmr - 1800) / 600) * 100)
+        else if (tier === 'Platinum') progressToNext = Math.round(((mmr - 2400) / 400) * 100)
+
+        // Count total quests available across all joined sessions
+        let totalQuizCount = 0
+        const savedSessions = localStorage.getItem('student_sessions')
+        if (savedSessions) {
+          const parsedSessions = JSON.parse(savedSessions)
+          const sessionIds = parsedSessions.map((s: any) => s.id)
+          if (sessionIds.length > 0) {
+            const { data: nodeIds } = await (supabase as any)
+              .from('skill_nodes')
+              .select('id')
+              .in('session_id', sessionIds)
+            if (nodeIds && nodeIds.length > 0) {
+              const nids = nodeIds.map((n: any) => n.id)
+              const { count: questCount } = await (supabase as any)
+                .from('quests')
+                .select('*', { count: 'exact', head: true })
+                .in('node_id', nids)
+              totalQuizCount = questCount || 0
+            }
+          }
+        }
+
+        // Streak & difficulty are derived from real activity — zero for new accounts
+        const difficultyClimb = totalQuizCount > 0 ? Math.max(1, Math.round(avg * 10)) : 0
+        const streakData = 0
+
+        setMmrData({
+          mmr, tier, next, progressToNext: Math.max(0, Math.min(100, progressToNext)),
+          winRate, difficultyClimb,
+          streak: streakData, totalQuiz: totalQuizCount,
           division
         } as any)
+
+        // Fetch last quest attempts for "Quest Terakhir" card
+        const { data: attempts } = await supabase
+          .from('quest_attempts')
+          .select('quest_id, is_correct')
+          .eq('user_id', auth.user.id)
+          .order('attempted_at', { ascending: false })
+          .limit(5)
+
+        if (attempts && attempts.length > 0) {
+          const questIds = [...new Set(attempts.map((a: any) => a.quest_id).filter(Boolean))]
+          if (questIds.length > 0) {
+            const { data: quests } = await supabase
+              .from('quests').select('id, node_id').in('id', questIds)
+            const questNodeMap: Record<string, string> = {}
+            ;(quests ?? []).forEach((q: any) => { questNodeMap[q.id] = q.node_id })
+            const nodeIds = [...new Set(Object.values(questNodeMap).filter(Boolean))]
+            const nodeNameMap: Record<string, string> = {}
+            if (nodeIds.length > 0) {
+              const { data: nodeDetails } = await supabase
+                .from('skill_nodes').select('id, title').in('id', nodeIds)
+              ;(nodeDetails ?? []).forEach((n: any) => { nodeNameMap[n.id] = n.title })
+            }
+            const firstQuestId = attempts[0].quest_id ?? ''
+            const firstNodeId = firstQuestId ? (questNodeMap[firstQuestId] ?? '') : ''
+            setQuestTerakhir({
+              topicTitle: (firstNodeId && nodeNameMap[firstNodeId]) ? nodeNameMap[firstNodeId] : 'Materi Terbaru',
+              results: attempts.map((a: any) => a.is_correct ?? false),
+              nodeId: firstNodeId,
+            })
+          }
+        }
+
+        // Find partial mastery node for "Lanjutkan Belajar" quick access
+        if (scores && scores.length > 0) {
+          const { data: partialScore } = await (supabase as any)
+            .from('mastery_scores')
+            .select('node_id, score')
+            .eq('user_id', auth.user.id)
+            .gt('score', 0)
+            .lt('score', 0.8)
+            .order('score', { ascending: false })
+            .limit(1)
+            .maybeSingle()
+
+          if (partialScore?.node_id) {
+            const { data: nodeInfo } = await (supabase as any)
+              .from('skill_nodes').select('id, title, session_id')
+              .eq('id', partialScore.node_id).maybeSingle()
+            if (nodeInfo) {
+              const savedSess = JSON.parse(localStorage.getItem('student_sessions') || '[]')
+              const matchSession = savedSess.find((s: any) => s.id === nodeInfo.session_id)
+              if (matchSession?.pin) {
+                setResumeNode({
+                  nodeId: partialScore.node_id,
+                  nodeTitle: nodeInfo.title,
+                  sessionPin: matchSession.pin,
+                  score: Math.round((partialScore.score ?? 0) * 100),
+                })
+              }
+            }
+          }
+        }
       }
     }
     loadSessionsAndStats()
-
-    // Load daily quiz result from localStorage
-    const saved = localStorage.getItem('daily_quiz_result')
-    if (saved) {
-      const parsed = JSON.parse(saved)
-      const today = new Date().toISOString().split('T')[0]
-      // Reset at 5am local: compare date
-      const now = new Date()
-      const resetHour = new Date()
-      resetHour.setHours(5, 0, 0, 0)
-      if (parsed.date === today && now >= resetHour) {
-        setDailyQuizResult(parsed)
-      } else if (parsed.date !== today) {
-        localStorage.removeItem('daily_quiz_result')
-      }
-    }
   }, [])
 
   if (isCheckingSession) {
@@ -121,7 +195,7 @@ export default function StudentDashboard() {
     )
   }
 
-  const { mmr, tier, next, progressToNext, winRate, difficultyClimb, streak, totalQuiz, division } = mmrData as any
+  const { mmr, tier, next, progressToNext, winRate, difficultyClimb, totalQuiz, division } = mmrData as any
 
   return (
     <div className="min-h-screen bg-[#FFF9F2] flex flex-col">
@@ -134,8 +208,74 @@ export default function StudentDashboard() {
           <h1 className="font-heading text-[38px] md:text-[46px] font-bold text-[#A27B2B] mb-2 leading-tight">
             Welcome back, <span className="text-[#322312]">{user?.full_name?.split(' ')[0] || user?.email?.split('@')[0] || 'Scholar'}.</span>
           </h1>
-          <p className="font-sans text-[16px] text-[#867B6D]">Your cognitive development is flourishing. {next.label} rank awaits its next evolution.</p>
+          <p className="font-sans text-[16px] text-[#867B6D]">
+            {totalQuiz === 0
+              ? `Mulai perjalanan kognitif Anda. Selesaikan kuis pertama untuk membuka tier ${next.label}.`
+              : `Your cognitive development is flourishing. ${next.label} rank awaits its next evolution.`}
+          </p>
         </div>
+
+        {/* Onboarding banner — only when no sessions */}
+        {joinedSessions.length === 0 && (
+          <div className="w-full max-w-[1100px] mb-8 bg-gradient-to-r from-[#2C1A08] to-[#5C3D1A] rounded-3xl p-7 md:p-8 flex flex-col md:flex-row items-start md:items-center gap-6 shadow-lg">
+            <div className="flex-1">
+              <p className="font-sans text-[11px] font-bold tracking-widest text-[#C8922A] uppercase mb-2">Mulai Perjalanan</p>
+              <h2 className="font-heading text-[24px] md:text-[28px] font-bold text-white leading-tight mb-2">
+                Masukkan PIN kelas dari dosenmu
+              </h2>
+              <p className="font-sans text-[13px] text-[#C4A882] leading-relaxed">
+                Dapatkan PIN dari dosen Anda untuk bergabung ke sesi dan mulai belajar dengan AI.
+              </p>
+            </div>
+            <form
+              onSubmit={(e) => { e.preventDefault(); if (pinInput.trim().length === 6) router.push(`/dashboard/student/sessions?pin=${pinInput.trim()}`) }}
+              className="flex flex-col sm:flex-row gap-3 w-full md:w-auto"
+            >
+              <input
+                type="text"
+                inputMode="numeric"
+                maxLength={6}
+                value={pinInput}
+                onChange={(e) => setPinInput(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                placeholder="000000"
+                className="w-full sm:w-40 bg-white/10 border border-white/20 text-white placeholder-white/40 rounded-xl px-4 py-3 font-mono text-[20px] tracking-widest text-center font-bold outline-none focus:border-[#C8922A] focus:ring-1 focus:ring-[#C8922A] transition-colors"
+              />
+              <button
+                type="submit"
+                disabled={pinInput.length !== 6}
+                className="bg-[#C8922A] hover:bg-[#A67520] disabled:opacity-40 disabled:cursor-not-allowed text-white py-3 px-6 rounded-xl font-sans font-bold transition-colors whitespace-nowrap"
+              >
+                Masuk ke Kelas
+              </button>
+            </form>
+          </div>
+        )}
+
+        {/* Lanjutkan Belajar quick access */}
+        {resumeNode && (
+          <div className="w-full max-w-[1100px] mb-6">
+            <button
+              onClick={() => router.push(`/session/${resumeNode.sessionPin}/node/${resumeNode.nodeId}/learn`)}
+              className="w-full bg-white border border-[#F0EAE1] rounded-2xl px-6 py-4 flex items-center gap-4 hover:shadow-md transition-shadow text-left group"
+            >
+              <div className="w-12 h-12 rounded-full bg-[#FDE2A6] flex items-center justify-center shrink-0">
+                <svg className="w-6 h-6 text-[#865F1D]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" />
+                </svg>
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="font-sans text-[11px] font-bold text-[#9A8F82] uppercase tracking-wider mb-0.5">Lanjutkan Belajar</p>
+                <p className="font-sans text-[15px] font-bold text-[#20150A] truncate">{resumeNode.nodeTitle}</p>
+                <div className="mt-1 w-full max-w-[200px] bg-[#F2ECE4] h-1.5 rounded-full overflow-hidden">
+                  <div className="bg-[#C8922A] h-full rounded-full" style={{ width: `${resumeNode.score}%` }} />
+                </div>
+              </div>
+              <svg className="w-5 h-5 text-[#C8922A] group-hover:translate-x-1 transition-transform shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+              </svg>
+            </button>
+          </div>
+        )}
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 w-full max-w-[1100px]">
           
@@ -153,9 +293,8 @@ export default function StudentDashboard() {
               
               <div className="flex items-end gap-3 mb-4">
                 <span className="font-heading text-[54px] font-bold text-[#865F1D] leading-none">{mmr.toLocaleString('en-US')}</span>
-                <span className="font-sans text-[13px] font-bold text-[#5BB47A] mb-1.5">+45 Today</span>
               </div>
-              
+
               <div className="w-full bg-[#F2ECE4] h-[6px] rounded-full overflow-hidden mb-2">
                 <div className="bg-[#865F1D] h-full rounded-full" style={{ width: `${progressToNext}%` }}></div>
               </div>
@@ -165,9 +304,9 @@ export default function StudentDashboard() {
             <div className="flex-1 flex flex-col justify-between py-2 gap-4">
               {[
                 { label: 'Win Rate', value: `${winRate}%`, progress: winRate },
-                { label: 'Difficulty Climb', value: `Level ${difficultyClimb}`, progress: difficultyClimb * 10 },
-                { label: 'Streak Consistency', value: `${streak} Days`, progress: Math.min(100, streak * 5) },
-                { label: 'Peer Help Quality', value: 'Top 5%', progress: 95 }
+                { label: 'Difficulty Climb', value: difficultyClimb > 0 ? `Level ${difficultyClimb}` : '—', progress: difficultyClimb * 10 },
+                { label: 'Streak Consistency', value: totalQuiz > 0 ? `${mmrData.streak} Days` : '—', progress: totalQuiz > 0 ? Math.min(100, mmrData.streak * 5) : 0 },
+                { label: 'Peer Help Quality', value: totalQuiz > 0 ? 'Top 5%' : '—', progress: totalQuiz > 0 ? 95 : 0 }
               ].map((stat, idx) => (
                 <div key={idx} className="w-full">
                   <div className="flex justify-between items-end mb-2">
@@ -220,37 +359,48 @@ export default function StudentDashboard() {
             </div>
           </div>
 
-          {/* Daily Quiz Card */}
+          {/* Quest Terakhir Card */}
           <div className="bg-[#FAEFE2] rounded-3xl p-7 border border-[#EFDECD] shadow-sm flex flex-col relative overflow-hidden">
-            <div className={`absolute top-6 right-6 px-3 py-1 rounded-full text-[11px] font-bold font-sans ${
-              dailyQuizResult ? 'bg-[#FDE2A6] text-[#7A5200]' : 'bg-[#A1EDBB] text-[#1E5D36]'
-            }`}>
-              {dailyQuizResult ? `+${dailyQuizResult.mmrGained} MMR` : '+250 XP'}
-            </div>
-            <h3 className="font-heading text-[22px] font-bold text-[#20150A] mb-1">Daily Quiz</h3>
-            <p className="font-sans text-[13px] text-[#71604F] mb-6">{dailyQuizResult ? dailyQuizResult.topic : dailyQuizTopic}</p>
-            
-            {dailyQuizResult ? (
+            <h3 className="font-heading text-[22px] font-bold text-[#20150A] mb-1">Quest Terakhir</h3>
+            <p className="font-sans text-[13px] text-[#71604F] mb-6 truncate">
+              {questTerakhir ? questTerakhir.topicTitle : 'Belum ada quest dikerjakan'}
+            </p>
+
+            {!questTerakhir ? (
+              <>
+                <div className="flex flex-col items-center text-center my-auto py-4 gap-4">
+                  <div className="w-16 h-16 rounded-full bg-[#E5D5C1] flex items-center justify-center">
+                    <svg className="w-7 h-7 text-[#71604F]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                    </svg>
+                  </div>
+                  <p className="font-sans text-[13px] text-[#71604F] leading-relaxed max-w-[240px]">
+                    Mulai kerjakan quest pertama Anda. Skor akan muncul di sini setelah Anda selesai.
+                  </p>
+                </div>
+                <button onClick={() => router.push('/dashboard/student/sessions')} className="mt-auto w-full bg-[#825C17] hover:bg-[#684911] text-white py-3.5 rounded-[14px] font-sans font-bold transition-colors shadow-md text-[14px]">
+                  Lihat Sessions
+                </button>
+              </>
+            ) : (
               <>
                 <div className="flex justify-between items-end mb-2">
                   <span className="font-sans text-[12px] font-bold text-[#6D5226]">
-                    Progress: {dailyQuizResult.results.filter(Boolean).length} / 5 Solved
+                    Benar: {questTerakhir.results.filter(Boolean).length} / {questTerakhir.results.length}
                   </span>
-                  <span className="font-sans text-[11px] text-[#1A8B49] font-bold">✓ Completed</span>
+                  <span className={`font-sans text-[11px] font-bold ${questTerakhir.results.filter(Boolean).length === questTerakhir.results.length ? 'text-[#1A8B49]' : 'text-[#C8922A]'}`}>
+                    {Math.round((questTerakhir.results.filter(Boolean).length / questTerakhir.results.length) * 100)}% Akurasi
+                  </span>
                 </div>
                 <div className="w-full bg-[#E5D5C1] h-2.5 rounded-full overflow-hidden mb-6">
-                  <div 
-                    className="bg-[#1A8B49] h-full transition-all duration-1000" 
-                    style={{ width: `${(dailyQuizResult.results.filter(Boolean).length / 5) * 100}%` }}
+                  <div
+                    className="bg-[#C8922A] h-full transition-all duration-700"
+                    style={{ width: `${(questTerakhir.results.filter(Boolean).length / questTerakhir.results.length) * 100}%` }}
                   />
                 </div>
                 <div className="flex gap-2 mb-8">
-                  {dailyQuizResult.results.map((correct, i) => (
-                    <div key={i} className={`flex-1 aspect-[5/4] rounded-lg border-2 flex items-center justify-center font-sans text-[12px] font-bold transition-colors ${
-                      correct
-                        ? 'bg-white border-[#1A8B49] text-[#1A8B49]'
-                        : 'bg-[#FDF0F0] border-[#E8B4B8] text-[#C0392B]'
-                    }`}>
+                  {questTerakhir.results.map((correct, i) => (
+                    <div key={i} className={`flex-1 aspect-[5/4] rounded-lg border-2 flex items-center justify-center font-sans text-[12px] font-bold transition-colors ${correct ? 'bg-white border-[#1A8B49] text-[#1A8B49]' : 'bg-[#FDF0F0] border-[#E8B4B8] text-[#C0392B]'}`}>
                       {correct
                         ? <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg>
                         : <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
@@ -258,29 +408,11 @@ export default function StudentDashboard() {
                     </div>
                   ))}
                 </div>
-                <button onClick={() => router.push('/dashboard/student/daily-quiz?review=1')} className="mt-auto w-full bg-[#5C3D1A] hover:bg-[#3F2810] text-white py-3.5 rounded-[14px] font-sans font-bold transition-colors shadow-md text-[14px] flex items-center justify-center gap-2">
-                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path strokeLinecap="round" strokeLinejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>
-                  Review Jawaban
-                </button>
-              </>
-            ) : (
-              <>
-                <div className="flex justify-between items-end mb-2">
-                  <span className="font-sans text-[12px] font-bold text-[#6D5226]">Progress: 0 / 5 Solved</span>
-                  <span className="font-sans text-[11px] text-[#93806C]">Next reward: 15 MMR</span>
-                </div>
-                <div className="w-full bg-[#E5D5C1] h-2.5 rounded-full overflow-hidden mb-6">
-                  <div className="bg-[#1A8B49] h-full transition-all duration-1000" style={{ width: '0%' }} />
-                </div>
-                <div className="flex gap-2 mb-8">
-                  {[1, 2, 3, 4, 5].map((q) => (
-                    <div key={q} className="flex-1 aspect-[5/4] rounded-lg border flex items-center justify-center font-sans text-[13px] font-bold bg-white border-[#E8DCCB] text-[#93806C]">
-                      {q}
-                    </div>
-                  ))}
-                </div>
-                <button onClick={() => router.push('/dashboard/student/daily-quiz')} className="mt-auto w-full bg-[#825C17] hover:bg-[#684911] text-white py-3.5 rounded-[14px] font-sans font-bold transition-colors shadow-md text-[14px]">
-                  Continue Session
+                <button
+                  onClick={() => router.push('/dashboard/student/sessions')}
+                  className="mt-auto w-full bg-[#825C17] hover:bg-[#684911] text-white py-3.5 rounded-[14px] font-sans font-bold transition-colors shadow-md text-[14px]"
+                >
+                  Lanjutkan Quest
                 </button>
               </>
             )}
@@ -298,7 +430,7 @@ export default function StudentDashboard() {
                   </svg>
                 </div>
                 <h4 className="font-sans text-[16px] font-bold text-[#20150A] mb-1">Total Quiz</h4>
-                <p className="font-sans text-[13px] text-[#9A8F82]">{totalQuiz} Quiz Solved</p>
+                <p className="font-sans text-[13px] text-[#9A8F82]">{totalQuiz} Quiz Available</p>
               </div>
               
               <div className="bg-white rounded-3xl border border-[#F0EAE1] p-6 flex flex-col items-center justify-center text-center shadow-sm">
@@ -321,15 +453,15 @@ export default function StudentDashboard() {
               
               <div className="relative z-10">
                 <h3 className="font-heading text-[26px] font-bold text-[#F8F3EC] mb-3">Aksara Scholar Badge</h3>
-                <p className="font-sans text-[15px] text-[#A6998A] leading-relaxed mb-6">
-                  You've reached the top 5% of active researchers this month. Your analytical approach to cognitive tasks is exceptional.
+                <p className="font-sans text-[15px] text-[#A6998A] leading-relaxed">
+                  {totalQuiz === 0
+                    ? 'Belum ada pencapaian. Selesaikan kuis pertama Anda untuk membuka badge perdana sebagai Aksara Scholar.'
+                    : mmr < 1500
+                      ? `Anda telah menyelesaikan ${totalQuiz} kuis dengan win rate ${winRate}%. Teruskan perjalanan menuju tier Silver untuk membuka badge berikutnya.`
+                      : mmr < 1800
+                        ? `Anda mencapai tier Silver dengan ${totalQuiz} kuis terselesaikan dan win rate ${winRate}%. ${1800 - mmr} MMR lagi menuju Gold.`
+                        : `Anda mencapai tier ${tier} dengan ${totalQuiz} kuis terselesaikan dan win rate ${winRate}%. Pendekatan analitis Anda terhadap tugas kognitif sangat mengesankan.`}
                 </p>
-                <button className="font-sans text-[14px] font-bold text-[#EAB308] hover:text-[#FFD15C] flex items-center gap-2 transition-colors">
-                  View all achievements
-                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M17 8l4 4m0 0l-4 4m4-4H3" />
-                  </svg>
-                </button>
               </div>
             </div>
 

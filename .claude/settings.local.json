@@ -6,7 +6,12 @@
       "Bash(npx ts-node *)",
       "Bash(npm uninstall *)",
       "Bash(Select-String -Pattern \"bkt\\\\.ts|quest\")",
-      "Bash(npx next *)"
+      "Bash(npx next *)",
+      "Bash(node *)",
+      "Bash(Get-ChildItem -Path \"C:\\\\Users\\\\ACER\\\\Documents\\\\Kuliah\\\\Semester 6\\\\Proyek pribadi\\\\aksara\\\\src\" -Recurse -Name)",
+      "Bash(New-Item -ItemType Directory -Force \"C:\\\\Users\\\\ACER\\\\Documents\\\\Kuliah\\\\Semester 6\\\\Proyek pribadi\\\\aksara\\\\src\\\\app\\\\api\\\\session\\\\[pin]\\\\nodes\\\\[nodeId]\\\\summary\")",
+      "Bash(Out-Null)",
+      "Bash(npx supabase *)"
     ]
   }
 }

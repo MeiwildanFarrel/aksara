@@ -1,4 +1,4 @@
-﻿import { generateJson } from './gemini'
+import { generateJson } from './gemini'
 
 export interface ChunkInput {
   content: string
@@ -15,6 +15,12 @@ export interface GeneratedQuest {
   options: string[]
   correct_index: number
   bloom_level: number
+}
+
+export interface NodeSummary {
+  summary: string
+  key_points: string[]
+  flash_cards: Array<{ front: string; back: string }>
 }
 
 export interface GeneratedVariant {
@@ -46,6 +52,7 @@ function extractJsonArray(raw: string): unknown {
 }
 
 function fallbackSkillTree(chunks: ChunkInput[]): SkillTopic[] {
+  console.warn('[quest-gen] Using fallback skill tree - Gemini parse failed')
   if (chunks.length === 0) return []
   const topicsCount = Math.min(3, chunks.length)
   const perTopic = Math.ceil(chunks.length / topicsCount)
@@ -55,8 +62,10 @@ function fallbackSkillTree(chunks: ChunkInput[]): SkillTopic[] {
     const endIdx = Math.min(startIdx + perTopic, chunks.length)
     const indices: number[] = []
     for (let j = startIdx; j < endIdx; j++) indices.push(j)
+    const firstChunkContent = chunks[startIdx].content ?? ''
+    const title = firstChunkContent.split(' ').slice(0, 6).join(' ') + '...'
     topics.push({
-      title: `Bagian ${i + 1}`,
+      title,
       chunkIndices: indices,
     })
   }
@@ -77,12 +86,17 @@ export async function generateSkillTree(
     .map((c, i) => `[${i}] ${c.content.slice(0, 400)}`)
     .join('\n\n')
 
+  const topicRange =
+    chunks.length < 10 ? '3-5' : chunks.length <= 20 ? '5-8' : '8-12'
+
   const prompt =
-    `Dari materi berikut, identifikasi 3-6 topik utama yang membentuk skill ` +
+    `Dari materi berikut, identifikasi ${topicRange} topik utama yang membentuk skill ` +
     `tree pembelajaran. Setiap topik harus bisa dijadikan node belajar yang ` +
     `mandiri. Return HANYA JSON array dengan format: ` +
     `[{title: string, chunkIndices: number[]}] di mana chunkIndices adalah ` +
-    `index chunk yang relevan untuk topik tersebut.\n\n` +
+    `index chunk yang relevan untuk topik tersebut.\n` +
+    `Pastikan setiap topik memiliki minimal 2 chunk yang relevan. ` +
+    `Jika materi sangat panjang, buat topik yang lebih spesifik dan granular.\n\n` +
     `Materi (setiap chunk diawali dengan [index]):\n${indexed}`
 
   try {
@@ -142,12 +156,15 @@ export async function generateQuestsForNode(
 > {
   if (relevantChunks.length === 0) return []
 
+  const questCount =
+    relevantChunks.length <= 2 ? 3 : relevantChunks.length <= 5 ? 5 : 8
+
   const materi = relevantChunks
     .map((c, i) => `[${i + 1}] ${c.content}`)
     .join('\n\n')
 
   const prompt =
-    `Buat 3 soal MCQ Bahasa Indonesia level Bloom ${bloomLevel} tentang topik ` +
+    `Buat ${questCount} soal MCQ Bahasa Indonesia level Bloom ${bloomLevel} tentang topik ` +
     `"${nodeTitle}" berdasarkan materi berikut. Setiap soal punya 4 pilihan ` +
     `jawaban, tepat 1 benar.\n` +
     `Return HANYA JSON array:\n` +
@@ -245,5 +262,70 @@ export async function generateVariants(
     const message = err instanceof Error ? err.message : String(err)
     console.warn(`[quest-gen] generateVariants failed: ${message}`)
     return []
+  }
+}
+
+const SUMMARY_FALLBACK: NodeSummary = {
+  summary: '',
+  key_points: [],
+  flash_cards: [],
+}
+
+function isValidFlashCard(obj: unknown): obj is { front: string; back: string } {
+  if (!obj || typeof obj !== 'object') return false
+  const fc = obj as Record<string, unknown>
+  return typeof fc.front === 'string' && typeof fc.back === 'string'
+}
+
+export async function generateNodeSummary(
+  nodeTitle: string,
+  relevantChunks: Array<{ content: string; source_ref: string }>,
+): Promise<NodeSummary> {
+  if (relevantChunks.length === 0) {
+    return { ...SUMMARY_FALLBACK, summary: nodeTitle }
+  }
+
+  const materi = relevantChunks
+    .map((c, i) => `[${i + 1}] ${c.content}`)
+    .join('\n\n')
+
+  const prompt =
+    `Dari materi berikut tentang topik "${nodeTitle}", buat ringkasan pembelajaran dalam Bahasa Indonesia.\n` +
+    `Return HANYA JSON dengan format:\n` +
+    `{\n` +
+    `  "summary": string (2-3 kalimat ringkasan),\n` +
+    `  "key_points": string[] (5-7 poin penting),\n` +
+    `  "flash_cards": [{"front": string, "back": string}] (4-6 flash card konsep kunci)\n` +
+    `}\n` +
+    `Gunakan bahasa yang mudah dipahami mahasiswa.\n\n` +
+    `Materi:\n${materi}`
+
+  try {
+    const raw = await generateJson(prompt)
+    const cleaned = stripCodeFence(raw)
+    const parsed = JSON.parse(cleaned) as Record<string, unknown>
+
+    const summary =
+      typeof parsed.summary === 'string' && parsed.summary.trim()
+        ? parsed.summary.trim()
+        : nodeTitle
+
+    const key_points = Array.isArray(parsed.key_points)
+      ? (parsed.key_points as unknown[])
+          .filter((p): p is string => typeof p === 'string' && p.trim().length > 0)
+          .map((p) => p.trim())
+      : []
+
+    const flash_cards = Array.isArray(parsed.flash_cards)
+      ? (parsed.flash_cards as unknown[])
+          .filter(isValidFlashCard)
+          .map((fc) => ({ front: fc.front.trim(), back: fc.back.trim() }))
+      : []
+
+    return { summary, key_points, flash_cards }
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err)
+    console.warn(`[quest-gen] generateNodeSummary "${nodeTitle}" failed: ${message}`)
+    return { ...SUMMARY_FALLBACK, summary: nodeTitle }
   }
 }

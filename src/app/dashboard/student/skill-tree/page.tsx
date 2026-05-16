@@ -46,13 +46,10 @@ export default function CoursesSkillTreePage() {
         return
       }
 
-      // Fetch sessions + instructor
+      // Fetch sessions from DB (fast — no AI call)
       const { data: sessionData } = await (supabase as any)
         .from('sessions')
-        .select(`
-          id, title, created_at,
-          users ( full_name )
-        `)
+        .select('id, title, created_at, instructor_id, users ( full_name, email, avatar_url )')
         .in('id', sessionIds)
         .eq('status', 'Active')
 
@@ -92,10 +89,18 @@ export default function CoursesSkillTreePage() {
         if (progress >= 100) status = 'Selesai'
         else if (progress > 0) status = 'Sedang Berjalan'
 
+        // Priority: localStorage instructor data (stored at join time from API, includes Auth metadata)
+        // → DB users relation (fast fallback) → email fallback
+        const savedSession = saved.find((ls: any) => ls.id === session.id)
+        const savedInstructor = savedSession?.instructor ?? savedSession?.users ?? null
+        const savedInstructorObj = Array.isArray(savedInstructor) ? savedInstructor[0] : savedInstructor
+        const dbUserObj = Array.isArray(session.users) ? session.users[0] : session.users
+        const instructorName = savedInstructorObj?.full_name || dbUserObj?.full_name || savedInstructorObj?.email?.split('@')[0] || dbUserObj?.email?.split('@')[0] || 'Dosen Aksara'
+
         return {
           id: session.id,
           title: session.title,
-          instructor: Array.isArray(session.users) ? session.users[0]?.full_name : session.users?.full_name || 'Instruktur',
+          instructor: instructorName,
           created_at: new Date(session.created_at).toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric' }),
           progress,
           totalNodes,

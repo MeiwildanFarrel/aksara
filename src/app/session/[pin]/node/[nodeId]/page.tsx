@@ -48,9 +48,10 @@ export default function QuestPage({ params }: { params: { pin: string, nodeId: s
   }>>({})
   
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [pendingSelection, setPendingSelection] = useState<number | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(true)
-  
+
   const [timeLeft, setTimeLeft] = useState(15 * 60) // 15 minutes default
   const [isTimeUp, setIsTimeUp] = useState(false)
 
@@ -115,12 +116,17 @@ export default function QuestPage({ params }: { params: { pin: string, nodeId: s
 
   async function handleOptionClick(idx: number) {
     if (answers[currentIndex] || isSubmitting || isTimeUp) return
-    
+
+    // Optimistic UI: tampilkan pilihan langsung + disable tombol sebelum response
+    setPendingSelection(idx)
     setIsSubmitting(true)
     setError(null)
 
+    const currentQuest = quests[currentIndex]
+    const controller = new AbortController()
+    const timeoutId = window.setTimeout(() => controller.abort(), 10_000)
+
     try {
-      const currentQuest = quests[currentIndex]
       const res = await fetch('/api/quest/submit', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -128,13 +134,14 @@ export default function QuestPage({ params }: { params: { pin: string, nodeId: s
           quest_id: currentQuest.id,
           selected_index: idx,
           session_id: sessionId
-        })
+        }),
+        signal: controller.signal
       })
 
       if (!res.ok) throw new Error('Gagal mengirim jawaban')
-      
+
       const data: SubmitResponse = await res.json()
-      
+
       setAnswers(prev => ({
         ...prev,
         [currentIndex]: {
@@ -144,9 +151,13 @@ export default function QuestPage({ params }: { params: { pin: string, nodeId: s
           aiInsight: data.feedback
         }
       }))
+      setPendingSelection(null)
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Terjadi kesalahan')
+      const isTimeout = err instanceof DOMException && err.name === 'AbortError'
+      setError(isTimeout ? 'Koneksi lambat, coba lagi.' : (err instanceof Error ? err.message : 'Terjadi kesalahan'))
+      setPendingSelection(null)
     } finally {
+      window.clearTimeout(timeoutId)
       setIsSubmitting(false)
     }
   }
@@ -272,41 +283,49 @@ export default function QuestPage({ params }: { params: { pin: string, nodeId: s
               const letter = String.fromCharCode(65 + idx)
               const isSelected = currentAnswer?.selectedIndex === idx
               const isCorrectOpt = currentAnswer?.result.correct_index === idx
-              
+              const isPending = pendingSelection === idx && !currentAnswer
+
               let wrapperClass = "flex items-center rounded-2xl border-2 p-4 transition-all duration-300 text-left w-full "
               let letterClass = "rounded-full w-8 h-8 shrink-0 flex items-center justify-center font-bold text-sm mr-4 transition-colors "
-              
-              if (!currentAnswer) {
-                // Not answered
+
+              if (!currentAnswer && isPending) {
+                // Optimistic pending state — highlight selected option immediately
+                wrapperClass += "border-[#C8922A] bg-[#FFF7E5] cursor-wait "
+                letterClass += "bg-[#C8922A] text-white"
+              } else if (!currentAnswer && pendingSelection !== null) {
+                // Another option pending — dim other options
+                wrapperClass += "border-[#F0EBE1] opacity-50 cursor-not-allowed "
+                letterClass += "bg-[#FDFBF7] text-[#D9CDB8]"
+              } else if (!currentAnswer) {
+                // Not answered, no pending
                 wrapperClass += "border-[#F0EBE1] hover:border-[#D9CDB8] hover:bg-[#FDFBF7] cursor-pointer"
                 letterClass += "bg-[#FDFBF7] text-[#D9CDB8]"
               } else {
                 // Answered state
                 wrapperClass += "cursor-default "
                 if (isCorrectOpt) {
-                  // This is the correct option
                   wrapperClass += "border-[#77B28C] bg-[#F4F9F6] "
                   letterClass += "bg-[#77B28C] text-white"
                 } else if (isSelected && !isCorrectOpt) {
-                  // This is the wrong option selected
                   wrapperClass += "border-[#D67B7B] bg-[#FCF5F5] "
                   letterClass += "bg-[#D67B7B] text-white"
                 } else {
-                  // Neutral other options
                   wrapperClass += "border-[#F0EBE1] opacity-60 "
                   letterClass += "bg-[#FDFBF7] text-[#D9CDB8]"
                 }
               }
 
               return (
-                <button 
-                  key={idx} 
+                <button
+                  key={idx}
                   onClick={() => handleOptionClick(idx)}
                   disabled={!!currentAnswer || isSubmitting || isTimeUp}
                   className={wrapperClass}
                 >
                   <div className={letterClass}>
-                    {currentAnswer && isCorrectOpt ? (
+                    {isPending ? (
+                      <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                    ) : currentAnswer && isCorrectOpt ? (
                       <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7"/></svg>
                     ) : currentAnswer && isSelected && !isCorrectOpt ? (
                       <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M6 18L18 6M6 6l12 12"/></svg>
@@ -314,9 +333,14 @@ export default function QuestPage({ params }: { params: { pin: string, nodeId: s
                       letter
                     )}
                   </div>
-                  <span className={`font-sans text-[15px] font-medium leading-relaxed ${currentAnswer && (isCorrectOpt || isSelected) ? 'text-[#2C1A08]' : 'text-[#5C3D1A]'}`}>
+                  <span className={`font-sans text-[15px] font-medium leading-relaxed ${(isPending || (currentAnswer && (isCorrectOpt || isSelected))) ? 'text-[#2C1A08]' : 'text-[#5C3D1A]'}`}>
                     {option}
                   </span>
+                  {isPending && (
+                    <div className="ml-auto bg-[#FDE68A] text-[#92400E] text-[10px] font-bold px-2 py-1 rounded-full whitespace-nowrap">
+                      Mengirim...
+                    </div>
+                  )}
                   {currentAnswer && isCorrectOpt && currentAnswer.result.xp_gained > 0 && isSelected && (
                     <div className="ml-auto bg-[#FDE68A] text-[#92400E] text-[10px] font-bold px-2 py-1 rounded-full whitespace-nowrap">
                       +{currentAnswer.result.xp_gained} XP

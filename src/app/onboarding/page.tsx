@@ -138,35 +138,7 @@ export default function OnboardingPage() {
               <p className="font-sans text-[14px] text-[#5C3D1A] leading-relaxed">Belajar lewat quest, raih mastery, naikkan MMR</p>
             </button>
           </div>
-
-          {/* Info Banner */}
-          <div className="bg-[#FAE8B0]/30 border border-dashed border-[#C8922A] rounded-xl p-5 flex gap-4 text-left items-start">
-            <div className="bg-[#C8922A] rounded-lg p-2.5 flex-shrink-0">
-              <svg className="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z" />
-              </svg>
-            </div>
-            <div>
-              <h3 className="font-sans font-bold text-[#2C1A08] text-[13px] mb-1">Butuh Bantuan?</h3>
-              <p className="font-sans text-[13px] text-[#5C3D1A] leading-relaxed">
-                Aksara menyarankan peran "Mahasiswa" jika Anda ingin mengakses perpustakaan kursus dan mengikuti ujian sertifikasi.
-              </p>
-            </div>
-          </div>
-
-          {/* Dots Indicator */}
-          <div className="flex gap-2 justify-center mt-10">
-            <div className="w-6 h-2 rounded-full bg-[#C8922A]"></div>
-            <div className="w-2 h-2 rounded-full bg-[#D9D9D9]"></div>
-            <div className="w-2 h-2 rounded-full bg-[#D9D9D9]"></div>
-          </div>
-        </div>
-
-        {/* Footer Link */}
-        <div className="mt-8 text-center">
-          <p className="font-sans text-[14px] text-[#8B6340]">
-            Sudah punya akun? <a href="/login" className="text-[#A67520] font-bold hover:text-[#C8922A] transition-colors">Masuk di sini</a>
-          </p>
+   
         </div>
 
       </div>

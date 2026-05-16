@@ -43,7 +43,8 @@ export default function StudentSessions() {
              const filteredSessions = sessions.filter((s: any) => activeIds.has(s.id))
              setJoinedSessions(filteredSessions)
 
-             // Fetch instructor profiles for filtered sessions
+             // Fetch instructor profiles from DB as fallback
+             // (session.instructor from localStorage takes priority in display)
              const uniqueInstructorIds = [...new Set(filteredSessions.map((s: any) => s.instructor_id).filter(Boolean))] as string[]
              if (uniqueInstructorIds.length > 0) {
                const { data: usersData } = await supabase
@@ -238,14 +239,19 @@ export default function StudentSessions() {
                 
                 {/* Instructor Info */}
                 {(() => {
+                  // Priority: session.instructor (stored in localStorage from API at join time,
+                  // includes Auth metadata full_name) → DB profile fallback → email → default
+                  const instructorObj = Array.isArray(session.instructor) ? session.instructor[0] : session.instructor
+                  const usersObj = Array.isArray(session.users) ? session.users[0] : session.users
                   const iProfile = instructorProfiles[session.instructor_id]
-                  const name = iProfile?.full_name || session.users?.email?.split('@')[0] || 'Dosen Aksara'
+                  const name = instructorObj?.full_name || usersObj?.full_name || iProfile?.full_name || instructorObj?.email?.split('@')[0] || usersObj?.email?.split('@')[0] || 'Dosen Aksara'
+                  const avatarUrl = instructorObj?.avatar_url || usersObj?.avatar_url || iProfile?.avatar_url
                   const initials = name.split(' ').map((n: string) => n[0]).join('').substring(0, 2).toUpperCase()
                   return (
                     <div className="flex items-center gap-2 mb-6">
                       <div className="w-7 h-7 rounded-full bg-[#FAF3EC] border border-[#E8DCCB] flex items-center justify-center text-[10px] font-bold text-[#8B6340] overflow-hidden shrink-0">
-                        {iProfile?.avatar_url ? (
-                          <img src={iProfile.avatar_url} alt={name} className="w-full h-full object-cover" />
+                        {avatarUrl ? (
+                          <img src={avatarUrl} alt={name} className="w-full h-full object-cover" />
                         ) : initials}
                       </div>
                       <p className="font-sans text-[13px] text-[#5C3D1A]">Instructor: <span className="font-semibold">{name}</span></p>
