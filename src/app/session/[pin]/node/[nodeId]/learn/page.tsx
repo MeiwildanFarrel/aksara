@@ -37,21 +37,37 @@ export default function LearnPage({ params }: { params: { pin: string; nodeId: s
         const json = await res.json()
         console.log('node summary response:', json)
 
-        // Defensive parse: key_points bisa datang sebagai JSON string jika DB menyimpannya salah format
-        let key_points: string[] = []
-        const raw_kp = json.key_points
-        if (Array.isArray(raw_kp)) {
-          key_points = raw_kp.filter((p: unknown): p is string => typeof p === 'string')
-        } else if (typeof raw_kp === 'string') {
+        // Normalize key_points — terima array apapun tipenya, convert ke string
+        const rawKp: unknown = json.key_points
+        let key_points: string[]
+        if (Array.isArray(rawKp)) {
+          key_points = rawKp.map((p: unknown) => String(p)).filter(Boolean)
+        } else if (typeof rawKp === 'string' && rawKp.trimStart().startsWith('[')) {
           try {
-            const parsed = JSON.parse(raw_kp)
-            if (Array.isArray(parsed)) key_points = parsed.filter((p: unknown): p is string => typeof p === 'string')
+            const parsed: unknown = JSON.parse(rawKp)
+            key_points = Array.isArray(parsed) ? parsed.map((p: unknown) => String(p)).filter(Boolean) : []
           } catch {
             key_points = []
           }
+        } else {
+          key_points = []
         }
 
-        setData({ ...json, key_points })
+        // Normalize flash_cards — selalu array, cegah crash jika null dari API
+        const rawFc: unknown = json.flash_cards
+        const flash_cards: FlashCard[] = Array.isArray(rawFc)
+          ? rawFc.filter(
+              (fc: unknown): fc is FlashCard =>
+                fc != null &&
+                typeof fc === 'object' &&
+                typeof (fc as Record<string, unknown>).front === 'string' &&
+                typeof (fc as Record<string, unknown>).back === 'string',
+            )
+          : []
+
+        console.log('key_points:', key_points, '| flash_cards:', flash_cards.length)
+
+        setData({ ...json, key_points, flash_cards })
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Terjadi kesalahan')
       } finally {
