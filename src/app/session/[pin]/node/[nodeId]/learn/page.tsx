@@ -34,8 +34,24 @@ export default function LearnPage({ params }: { params: { pin: string; nodeId: s
       try {
         const res = await fetch(`/api/session/${pin}/nodes/${nodeId}/summary`)
         if (!res.ok) throw new Error('Gagal memuat materi')
-        const json: NodeSummaryData = await res.json()
-        setData(json)
+        const json = await res.json()
+        console.log('node summary response:', json)
+
+        // Defensive parse: key_points bisa datang sebagai JSON string jika DB menyimpannya salah format
+        let key_points: string[] = []
+        const raw_kp = json.key_points
+        if (Array.isArray(raw_kp)) {
+          key_points = raw_kp.filter((p: unknown): p is string => typeof p === 'string')
+        } else if (typeof raw_kp === 'string') {
+          try {
+            const parsed = JSON.parse(raw_kp)
+            if (Array.isArray(parsed)) key_points = parsed.filter((p: unknown): p is string => typeof p === 'string')
+          } catch {
+            key_points = []
+          }
+        }
+
+        setData({ ...json, key_points })
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Terjadi kesalahan')
       } finally {
