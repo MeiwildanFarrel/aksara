@@ -200,13 +200,13 @@ export default function SessionDetail({ params }: { params: { pin: string } }) {
              const parts = session.title.split(':')
              if (parts.length > 1) {
                return (
-                 <h1 className="font-heading text-[48px] md:text-[56px] font-bold leading-tight tracking-tight">
+                 <h1 className="font-heading text-[32px] sm:text-[42px] md:text-[56px] font-bold leading-tight tracking-tight">
                    <span className="text-[#2C1A08] block">{parts[0]}:</span>
                    <span className="text-[#C8922A] block">{parts.slice(1).join(':').trim()}</span>
                  </h1>
                )
              }
-             return <h1 className="font-heading text-[48px] md:text-[56px] font-bold text-[#2C1A08] leading-tight tracking-tight">{session.title}</h1>
+             return <h1 className="font-heading text-[32px] sm:text-[42px] md:text-[56px] font-bold text-[#2C1A08] leading-tight tracking-tight">{session.title}</h1>
           })()}
         </div>
 
@@ -238,7 +238,7 @@ export default function SessionDetail({ params }: { params: { pin: string } }) {
         </p>
 
         {/* Stats */}
-        <div className="flex gap-16 md:gap-24 mb-24 text-center">
+        <div className="flex flex-col sm:flex-row gap-8 sm:gap-16 md:gap-24 mb-24 text-center">
           <div>
             <span className="text-[10px] font-bold font-sans text-[#8B6340] uppercase tracking-widest block mb-2">Estimasi Waktu</span>
             <span className="font-heading text-[26px] font-bold text-[#C8922A]">{nodes.length > 0 ? nodes.length : 12} Sesi Quest</span>
@@ -250,10 +250,10 @@ export default function SessionDetail({ params }: { params: { pin: string } }) {
         </div>
 
         {/* Skill Tree CTA */}
-        <div className="w-full flex justify-center mb-16">
+        <div className="w-full flex justify-center mb-16 px-0">
           <button
             onClick={() => router.push(`/dashboard/student/skill-tree/${session.id}`)}
-            className="bg-[#C8922A] hover:bg-[#A67520] text-white font-sans font-semibold rounded-full px-6 py-3 flex items-center gap-2 transition-colors shadow-md"
+            className="w-full sm:w-auto bg-[#C8922A] hover:bg-[#A67520] text-white font-sans font-semibold rounded-full px-6 py-3 flex items-center justify-center gap-2 transition-colors shadow-md"
           >
             Mulai Belajar — Buka Skill Tree
             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>

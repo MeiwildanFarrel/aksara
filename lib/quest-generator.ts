@@ -18,7 +18,7 @@ export interface GeneratedQuest {
 }
 
 export interface NodeSummary {
-  summary: string
+  summary: string | null
   key_points: string[]
   flash_cards: Array<{ front: string; back: string }>
 }
@@ -266,7 +266,7 @@ export async function generateVariants(
 }
 
 const SUMMARY_FALLBACK: NodeSummary = {
-  summary: '',
+  summary: null,
   key_points: [],
   flash_cards: [],
 }
@@ -282,7 +282,8 @@ export async function generateNodeSummary(
   relevantChunks: Array<{ content: string; source_ref: string }>,
 ): Promise<NodeSummary> {
   if (relevantChunks.length === 0) {
-    return { ...SUMMARY_FALLBACK, summary: nodeTitle }
+    console.warn('[quest-gen] Summary generation failed for node:', nodeTitle, '— will be backfilled later')
+    return { ...SUMMARY_FALLBACK }
   }
 
   const materi = relevantChunks
@@ -308,7 +309,7 @@ export async function generateNodeSummary(
     const summary =
       typeof parsed.summary === 'string' && parsed.summary.trim()
         ? parsed.summary.trim()
-        : nodeTitle
+        : null
 
     const key_points = Array.isArray(parsed.key_points)
       ? (parsed.key_points as unknown[])
@@ -325,7 +326,8 @@ export async function generateNodeSummary(
     return { summary, key_points, flash_cards }
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err)
-    console.warn(`[quest-gen] generateNodeSummary "${nodeTitle}" failed: ${message}`)
-    return { ...SUMMARY_FALLBACK, summary: nodeTitle }
+    console.warn('[quest-gen] Summary generation failed for node:', nodeTitle, '— will be backfilled later')
+    console.warn(`[quest-gen] generateNodeSummary detail: ${message}`)
+    return { ...SUMMARY_FALLBACK }
   }
 }

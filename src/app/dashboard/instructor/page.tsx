@@ -4,17 +4,11 @@ import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import Image from 'next/image'
-import { createClient } from '../../../../lib/supabase/client'
-import { Home, BookOpen, BarChart2, BrainCircuit, Settings, HelpCircle, LogOut, Copy } from 'lucide-react'
+import { Copy } from 'lucide-react'
+import InstructorSidebar from './components/InstructorSidebar'
 
-// Import assets from src/app/public where available, or use lucide-react as fallback
-import addCoursesIcon from '../../public/add_courses.png'
-import analyticsIcon from '../../public/analytics.png'
-import helpIcon from '../../public/help.png'
-import logoutIcon from '../../public/logout.png'
 import studentIcon from '../../public/student.png'
 import bookIcon from '../../public/book.png'
-import wmIcon from '../../public/wm_icon.png'
 
 interface Session {
   id: string
@@ -40,7 +34,6 @@ export default function InstructorDashboard() {
   const [sessions, setSessions] = useState<Session[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [isModalOpen, setIsModalOpen] = useState(false)
-  const [isSidebarOpen, setIsSidebarOpen] = useState(false)
   const [newTitle, setNewTitle] = useState('')
   const [isCreating, setIsCreating] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -97,12 +90,6 @@ export default function InstructorDashboard() {
     fetchData()
   }, [])
 
-  async function handleSignOut() {
-    const supabase = createClient()
-    await supabase.auth.signOut()
-    router.replace('/login')
-  }
-
   async function handleCreateSession(e: React.FormEvent) {
     e.preventDefault()
     if (!newTitle.trim()) return
@@ -149,97 +136,10 @@ export default function InstructorDashboard() {
 
   return (
     <div className="flex h-screen bg-white text-[#2C1A08] font-sans overflow-hidden">
-      {/* Mobile backdrop */}
-      {isSidebarOpen && (
-        <div
-          className="fixed inset-0 bg-black/40 z-30 md:hidden"
-          onClick={() => setIsSidebarOpen(false)}
-        />
-      )}
-
-      {/* Sidebar — fixed drawer on mobile, static on desktop */}
-      <aside className={`fixed md:static left-0 top-0 h-full z-40 md:z-auto w-[280px] bg-[#FFF8EE] border-r border-[#F0E5D5] flex flex-col justify-between transition-transform duration-300 md:translate-x-0 ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}>
-        <div className="p-8">
-          <div className="flex flex-col items-center mb-10">
-            <div className="relative w-20 h-20 rounded-full overflow-hidden border-2 border-transparent ring-2 ring-[#C8922A]/20 bg-[#FAF3EC] mb-4 flex items-center justify-center text-2xl font-bold text-[#8B6340]">
-              {user?.avatar_url ? (
-                <img src={user.avatar_url} alt="Profile" className="object-cover w-full h-full" />
-              ) : (
-                (user?.full_name || 'DS').split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase()
-              )}
-            </div>
-            <h2 className="font-heading text-xl font-bold text-[#5C3D1A] text-center">{user?.full_name || 'Dosen'}</h2>
-            <p className="text-sm text-[#8B6340]">{user?.university || 'Akademisi'}</p>
-          </div>
-
-          <nav className="flex flex-col gap-2">
-            <Link
-              prefetch
-              href="/dashboard/instructor"
-              className="flex items-center gap-3 w-full bg-[#F3D580] text-[#5C3D1A] rounded-xl px-4 py-3 font-semibold transition-all">
-              <Home size={18} />
-              DASHBOARD
-            </Link>
-            <Link
-              prefetch
-              href="/dashboard/instructor/courses"
-              className="flex items-center gap-3 w-full hover:bg-[#F3D580]/30 text-[#8B6340] rounded-xl px-4 py-3 font-medium transition-all">
-              <BookOpen size={18} />
-              COURSES
-            </Link>
-            <Link
-              prefetch
-              href="/dashboard/instructor/analytics"
-              className="flex items-center gap-3 w-full hover:bg-[#F3D580]/30 text-[#8B6340] rounded-xl px-4 py-3 font-medium transition-all">
-              <BarChart2 size={18} />
-              ANALYTICS
-            </Link>
-            <Link
-              prefetch
-              href="/dashboard/instructor/cognitive"
-              className="flex items-center gap-3 w-full hover:bg-[#F3D580]/30 text-[#8B6340] rounded-xl px-4 py-3 font-medium transition-all">
-              <BrainCircuit size={18} />
-              COGNITIVE
-            </Link>
-          </nav>
-        </div>
-
-        <div className="p-8 flex flex-col gap-2">
-          <Link
-            prefetch
-            href="/dashboard/instructor/settings"
-            className="flex items-center gap-3 w-full hover:bg-[#F3D580]/30 text-[#8B6340] rounded-xl px-4 py-3 font-medium transition-all"
-          >
-            <Settings size={18} />
-            Setting Profile
-          </Link>
-          <button onClick={handleSignOut} className="flex items-center gap-3 w-full hover:bg-[#F3D580]/30 text-[#C0392B] rounded-xl px-4 py-3 font-semibold transition-all">
-            <LogOut size={18} />
-            Logout
-          </button>
-        </div>
-      </aside>
+      <InstructorSidebar user={user} active="dashboard" />
 
       {/* Main Content */}
-      <main className="flex-1 overflow-y-auto min-w-0">
-        {/* Mobile top bar with hamburger */}
-        <div className="md:hidden flex items-center gap-3 px-4 py-3 border-b border-[#F0E5D5] sticky top-0 bg-white z-20">
-          <button
-            onClick={() => setIsSidebarOpen(true)}
-            className="p-2.5 rounded-lg text-[#5C3D1A] hover:bg-[#F5EFE9] transition-colors min-h-[44px] min-w-[44px] flex items-center justify-center"
-            aria-label="Buka menu"
-          >
-            <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 12h16M4 18h16" />
-            </svg>
-          </button>
-          <div className="flex items-center gap-2">
-            <div className="relative w-7 h-7">
-              <Image src={wmIcon} alt="AKSARA" fill className="object-contain" />
-            </div>
-            <span className="font-heading text-lg font-bold text-[#2C1A08]">AKSARA</span>
-          </div>
-        </div>
+      <main className="flex-1 overflow-y-auto min-w-0 pt-14 md:pt-0">
 
         <div className="max-w-5xl mx-auto p-6 md:p-10">
 

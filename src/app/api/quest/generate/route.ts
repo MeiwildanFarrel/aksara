@@ -279,10 +279,17 @@ export async function POST(request: NextRequest) {
 
     // 12. Parallel: generate summaries for all nodes and save to DB
     //     Best-effort — errors here don't fail the overall response.
+    //     If summary is null (rate limit / timeout), skip the DB update so backfill can detect it.
     await Promise.all(
       nodeRecords.map(async (node) => {
         try {
           const summary = await generateNodeSummary(node.title, node.relevantChunks)
+
+          if (summary.summary === null) {
+            console.warn('[quest-gen] Summary generation failed for node:', node.title, '— will be backfilled later')
+            return
+          }
+
           // New columns added by migration — generated types don't include them yet
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           const summaryPayload = { summary: summary.summary, key_points: summary.key_points, flash_cards: summary.flash_cards } as any
@@ -299,7 +306,8 @@ export async function POST(request: NextRequest) {
           }
         } catch (err) {
           const msg = err instanceof Error ? err.message : String(err)
-          console.warn(`[quest-gen] generateNodeSummary failed for "${node.title}": ${msg}`)
+          console.warn('[quest-gen] Summary generation failed for node:', node.title, '— will be backfilled later')
+          console.warn(`[quest-gen] generateNodeSummary detail: ${msg}`)
         }
       }),
     )

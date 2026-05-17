@@ -3,7 +3,6 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import ReactMarkdown from 'react-markdown'
-import Image from 'next/image'
 import { createClient } from '../../../../../../lib/supabase/client'
 
 interface Quest {
@@ -25,7 +24,7 @@ interface SubmitResponse {
 
 interface NodeData {
   title: string
-  timer?: string
+  timer?: string | null
 }
 
 export default function QuestPage({ params }: { params: { pin: string, nodeId: string } }) {
@@ -253,16 +252,16 @@ export default function QuestPage({ params }: { params: { pin: string, nodeId: s
     <div className="min-h-screen bg-[#FDFBF7] text-[#2C1A08] font-sans pb-10">
       {/* Top Navigation */}
       <div className="max-w-4xl mx-auto px-6 py-6">
-        <div className="flex justify-between items-center mb-6">
-          <div className="flex items-center gap-2 font-sans text-[13px] font-semibold text-[#8B6340]">
-            <button onClick={() => router.push(`/session/${pin}`)} className="mr-1 hover:text-[#C8922A] transition-colors">
+        <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 mb-6">
+          <div className="flex items-center gap-2 font-sans text-[13px] font-semibold text-[#8B6340] min-w-0">
+            <button onClick={() => router.push(`/session/${pin}`)} className="mr-1 hover:text-[#C8922A] transition-colors shrink-0">
               <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M10 19l-7-7m0 0l7-7m-7 7h18" /></svg>
             </button>
-            <span className="truncate max-w-[150px] sm:max-w-xs">{sessionTitle}</span>
-            <span className="text-[#EDE4D3] mx-1">&gt;</span>
-            <span className="text-[#C8922A]">Quiz No {nodeData?.title ? nodeData.title.replace(/\D/g, '') || (currentIndex + 1) : currentIndex + 1}</span>
+            <span className="truncate">{sessionTitle}</span>
+            <span className="text-[#EDE4D3] mx-1 shrink-0">&gt;</span>
+            <span className="text-[#C8922A] whitespace-nowrap shrink-0">Quiz No {nodeData?.title ? nodeData.title.replace(/\D/g, '') || (currentIndex + 1) : currentIndex + 1}</span>
           </div>
-          <div className="flex items-center gap-2 font-sans font-bold text-[#2C1A08] bg-white border border-[#EDE4D3] px-3 py-1.5 rounded-full shadow-sm">
+          <div className="flex items-center gap-2 font-sans font-bold text-[#2C1A08] bg-white border border-[#EDE4D3] px-3 py-1.5 rounded-full shadow-sm self-start sm:self-auto">
             <svg className="w-4 h-4 text-[#8B6340]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
             </svg>

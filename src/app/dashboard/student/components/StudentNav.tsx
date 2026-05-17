@@ -306,7 +306,7 @@ export default function StudentNav({ active = 'dashboard', user: providedUser }:
           </button>
 
           {isNotificationOpen && (
-            <div className="absolute right-[-72px] md:right-0 top-14 w-[340px] md:w-[384px] max-h-[530px] overflow-hidden rounded-[24px] bg-white border border-[#E8DCCB] shadow-[0_22px_55px_rgba(44,26,8,0.25)]">
+            <div className="fixed md:absolute left-2 right-2 md:left-auto md:right-0 top-[70px] md:top-14 md:w-[384px] max-h-[530px] overflow-hidden rounded-[24px] bg-white border border-[#E8DCCB] shadow-[0_22px_55px_rgba(44,26,8,0.25)]">
               <div className="flex items-center justify-between px-6 py-6 border-b border-[#E8DCCB]">
                 <h2 className="font-heading text-[26px] font-bold text-[#2C1A08]">Notifications</h2>
                 <button onClick={handleMarkAllRead} className="text-[13px] font-semibold text-[#7B5209] hover:text-[#C8922A]">Mark all read</button>

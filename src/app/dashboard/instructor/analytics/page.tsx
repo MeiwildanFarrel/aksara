@@ -2,8 +2,8 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { createClient } from '@/lib/supabase/client'
-import { Search, Filter, Key, Calendar, CheckCircle2, BarChart2, BrainCircuit, Settings, Home, BookOpen, HelpCircle, LogOut } from 'lucide-react'
+import { Search, Filter, Key, Calendar, CheckCircle2, BarChart2 } from 'lucide-react'
+import InstructorSidebar from '../components/InstructorSidebar'
 
 interface Session {
   id: string
@@ -56,12 +56,6 @@ export default function AnalyticsModulesPage() {
     fetchData()
   }, [])
 
-  async function handleSignOut() {
-    const supabase = createClient()
-    await supabase.auth.signOut()
-    router.replace('/login')
-  }
-
   const filteredSessions = sessions.filter(
     (s) =>
       s.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -95,65 +89,10 @@ export default function AnalyticsModulesPage() {
 
   return (
     <div className="flex h-screen bg-[#FDF9F3] text-[#2C1A08] font-sans overflow-hidden">
-      {/* Sidebar */}
-      <aside className="w-[280px] bg-[#FFF8EE] border-r border-[#F0E5D5] flex flex-col justify-between shrink-0 z-10">
-        <div className="p-8">
-          <div className="flex flex-col items-center mb-10">
-            <div className="relative w-20 h-20 rounded-full overflow-hidden border-2 border-transparent ring-2 ring-[#C8922A]/20 bg-[#FAF3EC] mb-4 flex items-center justify-center text-2xl font-bold text-[#8B6340]">
-              {user?.avatar_url ? (
-                <img src={user.avatar_url} alt="Profile" className="object-cover w-full h-full" />
-              ) : (
-                (user?.full_name || 'DS').split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase()
-              )}
-            </div>
-            <h2 className="font-heading text-xl font-bold text-[#5C3D1A] text-center">{user?.full_name || 'Dosen'}</h2>
-            <p className="text-sm text-[#8B6340]">{user?.university || 'Akademisi'}</p>
-          </div>
-
-          <nav className="flex flex-col gap-2">
-            <button 
-              onClick={() => router.push('/dashboard/instructor')}
-              className="flex items-center gap-3 w-full hover:bg-[#F3D580]/30 text-[#8B6340] rounded-xl px-4 py-3 font-medium transition-all">
-              <Home size={18} />
-              DASHBOARD
-            </button>
-            <button 
-              onClick={() => router.push('/dashboard/instructor/courses')}
-              className="flex items-center gap-3 w-full hover:bg-[#F3D580]/30 text-[#8B6340] rounded-xl px-4 py-3 font-medium transition-all">
-              <BookOpen size={18} />
-              COURSES
-            </button>
-            <button 
-              className="flex items-center gap-3 w-full bg-[#F3D580] text-[#5C3D1A] rounded-xl px-4 py-3 font-semibold transition-all">
-              <BarChart2 size={18} />
-              ANALYTICS
-            </button>
-            <button 
-              onClick={() => router.push('/dashboard/instructor/cognitive')}
-              className="flex items-center gap-3 w-full hover:bg-[#F3D580]/30 text-[#8B6340] rounded-xl px-4 py-3 font-medium transition-all">
-              <BrainCircuit size={18} />
-              COGNITIVE
-            </button>
-          </nav>
-        </div>
-
-        <div className="p-8 flex flex-col gap-2 border-t border-[#F0E5D5]/50">
-          <button 
-            onClick={() => router.push('/dashboard/instructor/settings')}
-            className="flex items-center gap-3 w-full hover:bg-[#F3D580]/30 text-[#8B6340] rounded-xl px-4 py-3 font-medium transition-all"
-          >
-            <Settings size={18} />
-            Setting Profile
-          </button>
-          <button onClick={handleSignOut} className="flex items-center gap-3 w-full hover:bg-[#F3D580]/30 text-[#C0392B] rounded-xl px-4 py-3 font-semibold transition-all">
-            <LogOut size={18} />
-            Logout
-          </button>
-        </div>
-      </aside>
+      <InstructorSidebar user={user} active="analytics" />
 
       {/* Main Content */}
-      <main className="flex-1 overflow-y-auto custom-scrollbar flex flex-col">
+      <main className="flex-1 overflow-y-auto custom-scrollbar flex flex-col pt-14 md:pt-0">
         <div className="flex-1 max-w-6xl mx-auto w-full px-10 py-10">
           <div className="mb-10">
             <h1 className="font-heading text-4xl font-bold text-[#2C1A08] mb-3">Analytics</h1>
@@ -179,7 +118,7 @@ export default function AnalyticsModulesPage() {
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {filteredSessions.map((session, index) => {
+            {filteredSessions.map((session) => {
               const { status, type } = getStatusInfo(session.status)
               const formattedDate = new Date(session.created_at).toLocaleDateString('id-ID', {
                 day: '2-digit',

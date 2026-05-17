@@ -12,7 +12,11 @@
       "Bash(New-Item -ItemType Directory -Force \"C:\\\\Users\\\\ACER\\\\Documents\\\\Kuliah\\\\Semester 6\\\\Proyek pribadi\\\\aksara\\\\src\\\\app\\\\api\\\\session\\\\[pin]\\\\nodes\\\\[nodeId]\\\\summary\")",
       "Bash(Out-Null)",
       "Bash(npx supabase *)",
-      "Bash(grep -E \"\\\\.\\(tsx|ts|jsx|js\\)$\")"
+      "Bash(grep -E \"\\\\.\\(tsx|ts|jsx|js\\)$\")",
+      "Bash(git stash *)",
+      "Bash(git checkout *)",
+      "Bash(npm run *)",
+      "Bash(grep -v \"^\\\\-\\\\-$\")"
     ]
   }
 }
