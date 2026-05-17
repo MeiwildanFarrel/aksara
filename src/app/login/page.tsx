@@ -2,9 +2,12 @@
 
 import { createClient } from '../../../lib/supabase/client'
 import Image from 'next/image'
+import { useSearchParams } from 'next/navigation'
 import wmIcon from '../public/wm_icon.png'
 
 export default function LoginPage() {
+  const searchParams = useSearchParams()
+  const hasCallbackError = searchParams.get('error') === 'auth_callback_error'
 
   const handleGoogleLogin = async () => {
     const supabase = createClient()
@@ -52,6 +55,20 @@ export default function LoginPage() {
           <p className="font-sans text-[#5C3D1A] text-[15px] mb-8 leading-relaxed px-2">
             Silakan masuk untuk melanjutkan ke dashboard akademik Anda
           </p>
+
+          {hasCallbackError && (
+            <div className="mb-6 flex flex-col items-center gap-3">
+              <p className="font-sans text-[#C0392B] text-[14px]">
+                Login gagal, silakan coba lagi.
+              </p>
+              <button
+                onClick={handleGoogleLogin}
+                className="w-full flex items-center justify-center gap-2 bg-[#C8922A] hover:bg-[#A67520] text-white px-6 py-4 rounded-full font-sans font-semibold transition-all duration-300 shadow-[0_4px_14px_rgba(200,146,42,0.25)] hover:shadow-[0_6px_20px_rgba(200,146,42,0.35)] hover:-translate-y-0.5 active:translate-y-0"
+              >
+                Coba Lagi →
+              </button>
+            </div>
+          )}
 
           <button
             onClick={handleGoogleLogin}

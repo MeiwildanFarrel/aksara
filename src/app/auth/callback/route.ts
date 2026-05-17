@@ -31,12 +31,26 @@ export async function GET(request: NextRequest) {
 
   let userId: string
   try {
-    const { data, error } = await supabase.auth.exchangeCodeForSession(code)
-    if (error || !data.user) {
-      console.error('[auth/callback] exchangeCodeForSession failed:', error)
+    let session = null
+    let lastError = null
+
+    for (let attempt = 0; attempt < 2; attempt++) {
+      const result = await supabase.auth.exchangeCodeForSession(code)
+      if (!result.error && result.data.user) {
+        session = result.data
+        break
+      }
+      lastError = result.error
+      if (attempt === 0) {
+        await new Promise(r => setTimeout(r, 1000))
+      }
+    }
+
+    if (!session) {
+      console.error('[auth/callback] exchangeCodeForSession failed after retry:', lastError)
       return NextResponse.redirect(`${origin}/login?error=auth_callback_error`)
     }
-    userId = data.user.id
+    userId = session.user.id
   } catch (err) {
     console.error('[auth/callback] unexpected error:', err)
     return NextResponse.redirect(`${origin}/login?error=auth_callback_error`)
