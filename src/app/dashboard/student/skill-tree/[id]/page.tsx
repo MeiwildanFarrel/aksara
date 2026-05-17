@@ -175,20 +175,18 @@ function StudentSkillTreePage({ sessionId }: { sessionId: string }) {
       if (!auth.user) { router.replace('/login'); return }
       if (userRes.ok) setUser(await userRes.json())
 
-      const saved: SessionRow[] = JSON.parse(localStorage.getItem('student_sessions') || '[]')
-      const sessionIds = saved.map(s => s.id).filter(Boolean)
-      if (sessionIds.length === 0) { setSessions([]); setIsLoading(false); return }
+      console.log('[SkillTree[id]] Fetching enrolled sessions from /api/student/sessions...')
+      const sessionsRes = await fetch('/api/student/sessions', { cache: 'no-store' })
+      console.log('[SkillTree[id]] /api/student/sessions status:', sessionsRes.status)
 
-      const { data: activeRows } = await (supabase as any)
-        .from('sessions')
-        .select('id, title, pin, status')
-        .in('id', sessionIds)
-        .eq('status', 'Active')
+      if (!sessionsRes.ok) { setSessions([]); setIsLoading(false); return }
+      const enrolledSessions: SessionRow[] = await sessionsRes.json()
+      console.log('[SkillTree[id]] enrolled sessions:', enrolledSessions)
 
-      const activeIds = new Set((activeRows ?? []).map((s: SessionRow) => s.id))
-      const merged = saved
-        .filter(s => activeIds.has(s.id))
-        .map(s => ({ ...s, ...(activeRows ?? []).find((r: SessionRow) => r.id === s.id), pin: s.pin }))
+      if (enrolledSessions.length === 0) { setSessions([]); setIsLoading(false); return }
+
+      const merged = enrolledSessions.filter(s => s.status === 'Active')
+      console.log('[SkillTree[id]] active sessions after filter:', merged)
 
       setSessions(merged)
       const requested = merged.find(s => s.id === sessionId)

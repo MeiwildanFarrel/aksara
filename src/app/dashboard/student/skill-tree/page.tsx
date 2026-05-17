@@ -37,8 +37,18 @@ export default function CoursesSkillTreePage() {
       }
       if (userRes.ok) setUser(await userRes.json())
 
-      const saved = JSON.parse(localStorage.getItem('student_sessions') || '[]')
-      const sessionIds = saved.map((s: any) => s.id).filter(Boolean)
+      console.log('[SkillTree] Fetching enrolled sessions from /api/student/sessions...')
+      const sessionsRes = await fetch('/api/student/sessions', { cache: 'no-store' })
+      console.log('[SkillTree] /api/student/sessions status:', sessionsRes.status)
+
+      if (!sessionsRes.ok) {
+        setCourses([])
+        setLoading(false)
+        return
+      }
+      const enrolledSessions = await sessionsRes.json()
+      console.log('[SkillTree] enrolled sessions:', enrolledSessions)
+      const sessionIds = enrolledSessions.map((s: any) => s.id).filter(Boolean)
 
       if (sessionIds.length === 0) {
         setCourses([])
@@ -52,6 +62,8 @@ export default function CoursesSkillTreePage() {
         .select('id, title, created_at, instructor_id, users ( full_name, email, avatar_url )')
         .in('id', sessionIds)
         .eq('status', 'Active')
+
+      console.log('[SkillTree] sessionData from DB:', sessionData)
 
       if (!sessionData || sessionData.length === 0) {
         setCourses([])
@@ -89,13 +101,8 @@ export default function CoursesSkillTreePage() {
         if (progress >= 100) status = 'Selesai'
         else if (progress > 0) status = 'Sedang Berjalan'
 
-        // Priority: localStorage instructor data (stored at join time from API, includes Auth metadata)
-        // → DB users relation (fast fallback) → email fallback
-        const savedSession = saved.find((ls: any) => ls.id === session.id)
-        const savedInstructor = savedSession?.instructor ?? savedSession?.users ?? null
-        const savedInstructorObj = Array.isArray(savedInstructor) ? savedInstructor[0] : savedInstructor
         const dbUserObj = Array.isArray(session.users) ? session.users[0] : session.users
-        const instructorName = savedInstructorObj?.full_name || dbUserObj?.full_name || savedInstructorObj?.email?.split('@')[0] || dbUserObj?.email?.split('@')[0] || 'Dosen Aksara'
+        const instructorName = dbUserObj?.full_name || dbUserObj?.email?.split('@')[0] || 'Dosen Aksara'
 
         return {
           id: session.id,

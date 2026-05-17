@@ -11,7 +11,8 @@
       "Bash(Get-ChildItem -Path \"C:\\\\Users\\\\ACER\\\\Documents\\\\Kuliah\\\\Semester 6\\\\Proyek pribadi\\\\aksara\\\\src\" -Recurse -Name)",
       "Bash(New-Item -ItemType Directory -Force \"C:\\\\Users\\\\ACER\\\\Documents\\\\Kuliah\\\\Semester 6\\\\Proyek pribadi\\\\aksara\\\\src\\\\app\\\\api\\\\session\\\\[pin]\\\\nodes\\\\[nodeId]\\\\summary\")",
       "Bash(Out-Null)",
-      "Bash(npx supabase *)"
+      "Bash(npx supabase *)",
+      "Bash(grep -E \"\\\\.\\(tsx|ts|jsx|js\\)$\")"
     ]
   }
 }
